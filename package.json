@@ -1,0 +1,27 @@
+{
+  "name": "tutor-manager",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.12.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev:frontend": "pnpm --filter @tutor-manager/frontend dev",
+    "dev:backend": "pnpm --filter @tutor-manager/backend start:dev",
+    "dev:desktop": "pnpm --filter @tutor-manager/desktop start",
+    "build": "pnpm --filter @tutor-manager/shared build && pnpm --filter @tutor-manager/backend build && pnpm --filter @tutor-manager/frontend build && pnpm --filter @tutor-manager/desktop build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@eslint/js": "9.12.0",
+    "eslint": "9.12.0",
+    "globals": "15.9.0",
+    "prettier": "3.3.3",
+    "typescript": "5.5.4",
+    "typescript-eslint": "8.8.0"
+  }
+}

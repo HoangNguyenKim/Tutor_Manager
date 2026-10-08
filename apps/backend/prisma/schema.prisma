@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// Money: integer VND. Durations: integer minutes. Timestamps: ISO UTC strings.
+// OAuth secrets are NEVER stored here — only provider account ids and scopes.
+
+model Student {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?
+  parentContact String?
+  grade     String?
+  subject   String?
+  hourlyRateVnd Int?
+  notes     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lessons            Lesson[]
+  payments           Payment[]
+  tuitionAdjustments TuitionAdjustment[]
+
+  @@index([isActive, name])
+}
+
+enum LessonStatus {
+  scheduled
+  completed
+  cancelled
+}
+
+model Lesson {
+  id               String       @id @default(cuid())
+  studentId        String
+  student          Student      @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  scheduledStart   DateTime
+  scheduledMinutes Int
+  actualMinutes    Int?
+  bonusMinutes     Int          @default(0)
+  billableMinutes  Int
+  // Historical rate snapshot: preserved at completion, never recalculated.
+  hourlyRateVnd    Int
+  tuitionVnd       Int
+  status           LessonStatus @default(scheduled)
+  deletedAt        DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  calendarLinks CalendarEventLink[]
+
+  @@index([studentId, scheduledStart])
+  @@index([status, scheduledStart])
+  @@index([deletedAt])
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  studentId String
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  amountVnd Int
+  paidAt    DateTime
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([studentId, paidAt])
+}
+
+model TuitionAdjustment {
+  id        String   @id @default(cuid())
+  studentId String
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  amountVnd Int
+  reason    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([studentId, createdAt])
+}
+
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model CalendarConnection {
+  id                String    @id @default(cuid())
+  provider          String    @default("google")
+  providerAccountId String
+  scopes            String
+  connectedAt       DateTime  @default(now())
+  lastSyncAt        DateTime?
+  // Refresh token lives in the backend/OS-secured store, referenced by pointer only.
+  secretRef         String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([provider, providerAccountId])
+}
+
+model CalendarEventLink {
+  id              String   @id @default(cuid())
+  lessonId        String
+  lesson          Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  provider        String   @default("google")
+  providerEventId String
+  lastPushedHash  String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([provider, providerEventId])
+  @@index([lessonId])
+}
+
+enum SyncOperationStatus {
+  pending
+  running
+  succeeded
+  failed
+}
+
+model SyncOperation {
+  id          String              @id @default(cuid())
+  startedAt   DateTime            @default(now())
+  finishedAt  DateTime?
+  status      SyncOperationStatus @default(pending)
+  pushedCount Int                 @default(0)
+  error       String?
+
+  conflicts SyncConflict[]
+}
+
+model SyncConflict {
+  id              String        @id @default(cuid())
+  operationId     String
+  operation       SyncOperation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+  lessonId        String
+  providerEventId String
+  localHash       String
+  remoteSummary   String
+  resolvedAt      DateTime?
+  createdAt       DateTime      @default(now())
+
+  @@index([operationId])
+  @@index([lessonId])
+}
