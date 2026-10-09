@@ -12,11 +12,6 @@ export class ListStudentsQuery {
   status?: 'active' | 'archived' | 'all';
 
   @IsOptional()
-  @IsString()
-  @MaxLength(60)
-  subject?: string;
-
-  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)

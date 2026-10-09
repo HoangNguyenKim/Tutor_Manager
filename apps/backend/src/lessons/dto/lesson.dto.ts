@@ -1,4 +1,6 @@
-import { IsDateString, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsDateString, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
+
+export const SUBJECTS = ['Toán', 'Văn', 'Anh', 'Sinh', 'Hóa', 'Lý'] as const;
 
 export class CreateLessonDto {
   @IsString()
@@ -13,6 +15,9 @@ export class CreateLessonDto {
   @Min(1)
   @Max(480)
   scheduledMinutes!: number;
+
+  @IsIn(SUBJECTS)
+  subject!: (typeof SUBJECTS)[number];
 
   @IsOptional()
   @IsString()
@@ -35,6 +40,10 @@ export class UpdateLessonDto {
   @Min(1)
   @Max(480)
   scheduledMinutes?: number;
+
+  @IsOptional()
+  @IsIn(SUBJECTS)
+  subject?: (typeof SUBJECTS)[number];
 
   @IsOptional()
   @IsString()
@@ -65,6 +74,33 @@ export class ListLessonsQuery {
   status?: 'scheduled' | 'completed' | 'cancelled' | 'all';
 }
 
+export class CompleteLessonDto {
+  @IsInt()
+  @Min(1)
+  @Max(480)
+  actualMinutes!: number;
+
+  @IsOptional()
+  @IsBoolean()
+  bonusBillable?: boolean;
+
+  @IsOptional()
+  @IsIn(['actual', 'planned'])
+  billingPolicy?: 'actual' | 'planned';
+}
+
+export class CorrectLessonDto {
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(480)
+  actualMinutes?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  bonusBillable?: boolean;
+}
+
 export class CreateRecurrenceDto {
   @IsString()
   @IsNotEmpty()
@@ -84,6 +120,9 @@ export class CreateRecurrenceDto {
   @Min(1)
   @Max(480)
   scheduledMinutes!: number;
+
+  @IsIn(SUBJECTS)
+  subject!: (typeof SUBJECTS)[number];
 
   @IsOptional()
   @IsString()

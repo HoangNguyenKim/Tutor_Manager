@@ -46,6 +46,7 @@ describe('Lessons API (e2e)', () => {
       studentId,
       scheduledStart: '2026-10-13T10:00:00Z',
       scheduledMinutes: 60,
+      subject: 'Toán',
       hourlyRateVnd: 200000,
     });
     expect(created.status).toBe(201);
@@ -60,6 +61,7 @@ describe('Lessons API (e2e)', () => {
       studentId,
       scheduledStart: '2026-10-13T10:30:00Z',
       scheduledMinutes: 60,
+      subject: 'Toán',
     });
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe('CONFLICT');
@@ -72,6 +74,7 @@ describe('Lessons API (e2e)', () => {
       studentId,
       scheduledStart: '2026-10-13T11:00:00Z',
       scheduledMinutes: 60,
+      subject: 'Toán',
     });
     expect(edge.status).toBe(201);
     const clash = await auth(request(server).patch(`/api/lessons/${edge.body.data.id}`)).send({
@@ -86,6 +89,7 @@ describe('Lessons API (e2e)', () => {
       studentId,
       scheduledStart: '2026-10-14T10:00:00Z',
       scheduledMinutes: 60,
+      subject: 'Toán',
     });
     const id = created.body.data.id as string;
     const cancelled = await auth(request(server).post(`/api/lessons/${id}/cancel`));
@@ -103,6 +107,7 @@ describe('Lessons API (e2e)', () => {
       weekday: 3,
       startTime: '17:00',
       scheduledMinutes: 90,
+      subject: 'Toán',
       timeZone: 'Asia/Ho_Chi_Minh',
       validFrom: '2026-10-12T00:00:00Z',
       validUntil: '2026-10-29T00:00:00Z',
@@ -122,4 +127,109 @@ describe('Lessons API (e2e)', () => {
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('VALIDATION');
   });
+
+  it('90 planned / 120 actual = 30 bonus; billable bonus charges correctly', async () => {
+    const server = app.getHttpServer();
+    const created = await auth(request(server).post('/api/lessons')).send({
+      studentId,
+      scheduledStart: '2026-11-10T10:00:00Z',
+      scheduledMinutes: 90,
+      subject: 'Toán',
+      hourlyRateVnd: 200000,
+    });
+    const id = created.body.data.id as string;
+    const done = await auth(request(server).post(`/api/lessons/${id}/complete`)).send({
+      actualMinutes: 120,
+      bonusBillable: true,
+    });
+    expect(done.status).toBe(200);
+    expect(done.body.data).toMatchObject({
+      status: 'completed',
+      actualMinutes: 120,
+      bonusMinutes: 30,
+      billableMinutes: 150,
+      tuitionVnd: 500000,
+    });
+  });
+
+  it('90 planned / 60 actual = 0 bonus (early finish)', async () => {
+    const server = app.getHttpServer();
+    const created = await auth(request(server).post('/api/lessons')).send({
+      studentId,
+      scheduledStart: '2026-11-11T10:00:00Z',
+      scheduledMinutes: 90,
+      subject: 'Toán',
+      hourlyRateVnd: 200000,
+    });
+    const done = await auth(request(server).post(`/api/lessons/${created.body.data.id}/complete`)).send({
+      actualMinutes: 60,
+    });
+    expect(done.body.data).toMatchObject({ bonusMinutes: 0, billableMinutes: 60, tuitionVnd: 200000 });
+  });
+
+  it('free bonus adds no bonus charge', async () => {
+    const server = app.getHttpServer();
+    const created = await auth(request(server).post('/api/lessons')).send({
+      studentId,
+      scheduledStart: '2026-11-12T10:00:00Z',
+      scheduledMinutes: 90,
+      subject: 'Toán',
+      hourlyRateVnd: 200000,
+    });
+    const done = await auth(request(server).post(`/api/lessons/${created.body.data.id}/complete`)).send({
+      actualMinutes: 120,
+      bonusBillable: false,
+    });
+    expect(done.body.data).toMatchObject({ bonusMinutes: 30, billableMinutes: 120, tuitionVnd: 400000 });
+  });
+
+  it('re-completing is a 409 that preserves the record', async () => {
+    const server = app.getHttpServer();
+    const created = await auth(request(server).post('/api/lessons')).send({
+      studentId,
+      scheduledStart: '2026-11-13T10:00:00Z',
+      scheduledMinutes: 60,
+      subject: 'Toán',
+    });
+    const id = created.body.data.id as string;
+    await auth(request(server).post(`/api/lessons/${id}/complete`)).send({ actualMinutes: 60 });
+    const again = await auth(request(server).post(`/api/lessons/${id}/complete`)).send({ actualMinutes: 60 });
+    expect(again.status).toBe(409);
+    expect(again.body.error.code).toBe('CONFLICT');
+  });
+
+  it('correcting a completed lesson recalculates safely against the snapshot', async () => {
+    const server = app.getHttpServer();
+    const created = await auth(request(server).post('/api/lessons')).send({
+      studentId,
+      scheduledStart: '2026-11-14T10:00:00Z',
+      scheduledMinutes: 90,
+      subject: 'Toán',
+      hourlyRateVnd: 200000,
+    });
+    const id = created.body.data.id as string;
+    await auth(request(server).post(`/api/lessons/${id}/complete`)).send({ actualMinutes: 90 });
+    const corrected = await auth(request(server).patch(`/api/lessons/${id}/correct`)).send({
+      actualMinutes: 120,
+      bonusBillable: true,
+    });
+    expect(corrected.body.data).toMatchObject({ bonusMinutes: 30, billableMinutes: 150, tuitionVnd: 500000 });
+  });
+
+  it('rejects invalid or negative durations', async () => {
+    const server = app.getHttpServer();
+    const created = await auth(request(server).post('/api/lessons')).send({
+      studentId,
+      scheduledStart: '2026-11-15T10:00:00Z',
+      scheduledMinutes: 60,
+      subject: 'Toán',
+    });
+    for (const body of [{ actualMinutes: 0 }, { actualMinutes: -30 }, { actualMinutes: 1.5 }, {}]) {
+      const res = await auth(request(server).post(`/api/lessons/${created.body.data.id}/complete`)).send(body);
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION');
+    }
+  });
 });
+
+

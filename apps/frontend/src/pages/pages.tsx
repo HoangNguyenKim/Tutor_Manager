@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react';
 import { vi } from '../i18n';
-import { Badge } from '../components/Badge';
 import { Button } from '../components/Button';
 import { Card, CardTitle } from '../components/Card';
 import { EmptyState, Skeleton } from '../components/Feedback';
 import { Label } from '../components/Field';
-import { Table } from '../components/Table';
 import { Page } from '../layout/Page';
 import { useToast } from '../toast';
 
@@ -43,24 +41,6 @@ export function DashboardPage() {
             ))}
       </div>
       <EmptyState title={vi.empty} hint="Dữ liệu sẽ hiện khi có học sinh và buổi học." />
-    </Page>
-  );
-}
-
-export function HoursPage() {
-  return (
-    <Page title={vi.hours}>
-      <Table head={['Học sinh', 'Phút dự kiến', 'Phút thực tế', 'Phút thưởng', 'Phút tính phí']} rows={[]} />
-      <EmptyState title={vi.empty} />
-    </Page>
-  );
-}
-
-export function TuitionPage() {
-  return (
-    <Page title={vi.tuition}>
-      <Badge tone="warning">Số tiền lưu dạng VND nguyên — API ở bước sau</Badge>
-      <EmptyState title={vi.empty} />
     </Page>
   );
 }

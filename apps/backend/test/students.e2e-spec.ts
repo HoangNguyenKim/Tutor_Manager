@@ -40,12 +40,11 @@ describe('Students API (e2e)', () => {
     await app.close();
   });
 
-  it('CRUD: create, get, update, list, search, filter', async () => {
+  it('CRUD: create, get, update, list, search', async () => {
     const server = app.getHttpServer();
     const created = await auth(request(server).post('/api/students')).send({
       name: 'Nguyen Van Test (fictional)',
       grade: '10',
-      subject: 'Toán',
       hourlyRateVnd: 200000,
       parentContact: 'Mẹ: 0900000000',
     });
@@ -63,11 +62,6 @@ describe('Students API (e2e)', () => {
 
     const search = await auth(request(server).get('/api/students?search=Van%20Test'));
     expect(search.body.data.total).toBe(1);
-
-    const filtered = await auth(request(server).get('/api/students?subject=Toán'));
-    expect(filtered.body.data.total).toBe(1);
-    const missed = await auth(request(server).get('/api/students?subject=Lý'));
-    expect(missed.body.data.total).toBe(0);
   });
 
   it('archive hides from default list; restore brings back; history preserved', async () => {
@@ -79,6 +73,7 @@ describe('Students API (e2e)', () => {
         studentId: id,
         scheduledStart: new Date(),
         scheduledMinutes: 60,
+        subject: 'Toán',
         billableMinutes: 60,
         hourlyRateVnd: 200000,
         tuitionVnd: 200000,

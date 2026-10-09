@@ -24,11 +24,11 @@ export class LessonsRepository {
       };
     }
     if (filter.studentId) where.studentId = filter.studentId;
-    if (filter.subject) where.student = { subject: filter.subject };
+    if (filter.subject) where.subject = filter.subject;
     if (filter.status && filter.status !== 'all') where.status = filter.status;
     return this.prisma.lesson.findMany({
       where,
-      include: { student: { select: { id: true, name: true, subject: true } } },
+      include: { student: { select: { id: true, name: true } } },
       orderBy: { scheduledStart: 'asc' },
       take: 500,
     });

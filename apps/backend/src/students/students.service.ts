@@ -18,7 +18,6 @@ export class StudentsService {
     return this.repo.list({
       search: trimOrUndefined(query.search),
       status: query.status ?? 'active',
-      subject: trimOrUndefined(query.subject),
       page: query.page ?? 1,
       pageSize: query.pageSize ?? 20,
     });
@@ -38,7 +37,6 @@ export class StudentsService {
       phone: trimOrUndefined(dto.phone),
       parentContact: trimOrUndefined(dto.parentContact),
       grade: trimOrUndefined(dto.grade),
-      subject: trimOrUndefined(dto.subject),
       hourlyRateVnd: dto.hourlyRateVnd,
       notes: trimOrUndefined(dto.notes),
     });
@@ -54,7 +52,6 @@ export class StudentsService {
       ...(dto.phone !== undefined ? { phone: trimOrUndefined(dto.phone) } : {}),
       ...(dto.parentContact !== undefined ? { parentContact: trimOrUndefined(dto.parentContact) } : {}),
       ...(dto.grade !== undefined ? { grade: trimOrUndefined(dto.grade) } : {}),
-      ...(dto.subject !== undefined ? { subject: trimOrUndefined(dto.subject) } : {}),
       ...(dto.hourlyRateVnd !== undefined ? { hourlyRateVnd: dto.hourlyRateVnd } : {}),
       ...(dto.notes !== undefined ? { notes: trimOrUndefined(dto.notes) } : {}),
     });

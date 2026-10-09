@@ -17,9 +17,9 @@ describe('StudentsService (unit)', () => {
     const repo = repoStub();
     repo.create.mockImplementation((d: unknown) => Promise.resolve(d));
     const svc = new StudentsService(repo as never);
-    await svc.create({ name: '  An  ', phone: '  ', subject: ' Toán ' });
+    await svc.create({ name: '  An  ', phone: '  ', grade: ' 10 ' });
     expect(repo.create).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'An', phone: undefined, subject: 'Toán' }),
+      expect.objectContaining({ name: 'An', phone: undefined, grade: '10' }),
     );
   });
 

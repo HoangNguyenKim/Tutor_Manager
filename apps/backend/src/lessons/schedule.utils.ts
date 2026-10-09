@@ -15,6 +15,55 @@ export function windowsOverlap(a: LessonWindow, b: LessonWindow): boolean {
   return a.start.getTime() < lessonEnd(b.start, b.minutes).getTime() && b.start.getTime() < lessonEnd(a.start, a.minutes).getTime();
 }
 
+export type BillingPolicy = 'actual' | 'planned';
+
+export interface TimeBreakdown {
+  scheduledMinutes: number;
+  actualMinutes: number;
+  bonusMinutes: number;
+  billableMinutes: number;
+}
+
+/**
+ * Teaching-time engine. All four minute kinds stay conceptually separate:
+ * scheduled (plan) vs actual (taught) vs bonus (overtime) vs billable (charged).
+ * Bonus = max(0, actual - planned); early finish forces bonus to zero.
+ */
+export function computeBonusMinutes(scheduledMinutes: number, actualMinutes: number): number {
+  return Math.max(0, actualMinutes - scheduledMinutes);
+}
+
+export function computeBillableMinutes(
+  scheduledMinutes: number,
+  actualMinutes: number,
+  policy: BillingPolicy,
+  bonusBillable: boolean,
+): number {
+  const bonus = computeBonusMinutes(scheduledMinutes, actualMinutes);
+  const base = policy === 'planned' ? scheduledMinutes : actualMinutes;
+  return base + (bonusBillable ? bonus : 0);
+}
+
+export function computeTimeBreakdown(
+  scheduledMinutes: number,
+  actualMinutes: number,
+  policy: BillingPolicy,
+  bonusBillable: boolean,
+): TimeBreakdown {
+  const bonusMinutes = computeBonusMinutes(scheduledMinutes, actualMinutes);
+  return {
+    scheduledMinutes,
+    actualMinutes,
+    bonusMinutes,
+    billableMinutes: computeBillableMinutes(scheduledMinutes, actualMinutes, policy, bonusBillable),
+  };
+}
+
+/** Integer-VND tuition from the preserved rate snapshot: rate * billable / 60, rounded half-up. */
+export function computeTuitionVnd(hourlyRateVnd: number, billableMinutes: number): number {
+  return Math.round((hourlyRateVnd * billableMinutes) / 60);
+}
+
 export function findOverlaps(candidate: LessonWindow, existing: LessonWindow[]): LessonWindow[] {
   return existing.filter((e) => e.id !== candidate.id && windowsOverlap(candidate, e));
 }

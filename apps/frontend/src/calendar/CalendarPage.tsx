@@ -13,6 +13,8 @@ import { EmptyState } from '../components/Feedback';
 import { Input, Label, Select } from '../components/Field';
 import { useCancelLesson, useCreateLesson, useLessons, useUpdateLesson, type LessonItem } from '../hooks/useLessons';
 import { useStudents } from '../hooks/useStudents';
+import { SUBJECTS, type Subject } from '@tutor-manager/shared';
+import { CompleteLessonDialog } from './CompleteLessonDialog';
 import { vi } from '../i18n';
 import { Page } from '../layout/Page';
 import { useToast } from '../toast';
@@ -43,6 +45,7 @@ function LessonDialog({
   const update = useUpdateLesson();
   const students = useStudents({ status: 'active', pageSize: 100 });
   const [studentId, setStudentId] = useState(initial?.studentId ?? '');
+  const [subject, setSubject] = useState<Subject>('Toán');
   const [start, setStart] = useState(initial ? toLocalInput(initial.start.toISOString()) : '');
   const [minutes, setMinutes] = useState('60');
   const [error, setError] = useState<string | null>(null);
@@ -69,10 +72,10 @@ function LessonDialog({
     }
     try {
       if (initial.id) {
-        await update.mutateAsync({ id: initial.id, dto: { scheduledStart: parsed.toISOString(), scheduledMinutes: mins } });
+        await update.mutateAsync({ id: initial.id, dto: { scheduledStart: parsed.toISOString(), scheduledMinutes: mins, subject } });
         push('Đã dời buổi học.');
       } else {
-        await create.mutateAsync({ studentId, scheduledStart: parsed.toISOString(), scheduledMinutes: mins, timeZone: DEFAULT_TZ });
+        await create.mutateAsync({ studentId, scheduledStart: parsed.toISOString(), scheduledMinutes: mins, subject, timeZone: DEFAULT_TZ });
         push('Đã tạo buổi học.');
       }
       onClose();
@@ -102,7 +105,16 @@ function LessonDialog({
             {(students.data?.items ?? []).map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
-                {s.subject ? ` — ${s.subject}` : ''}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="les-subject">Môn học *</Label>
+          <Select id="les-subject" value={subject} onChange={(e) => setSubject(e.target.value as Subject)}>
+            {SUBJECTS.map((m) => (
+              <option key={m} value={m}>
+                {m}
               </option>
             ))}
           </Select>
@@ -143,6 +155,7 @@ export function CalendarPage() {
   });
   const [dialog, setDialog] = useState<{ id?: string; start: Date; studentId?: string } | null>(null);
   const [pendingDrop, setPendingDrop] = useState<{ id: string; start: Date } | null>(null);
+  const [completing, setCompleting] = useState<LessonItem | null>(null);
 
   const lessons = useLessons({
     from: range.from,
@@ -159,7 +172,7 @@ export function CalendarPage() {
     () =>
       (lessons.data?.items ?? []).map((l: LessonItem) => ({
         id: l.id,
-        title: `${l.student?.name ?? '—'}${l.status === 'cancelled' ? ' (đã hủy)' : ''}`,
+        title: `${l.student?.name ?? '—'} · ${l.subject}${l.status === 'cancelled' ? ' (đã hủy)' : ''}`,
         start: l.scheduledStart,
         end: new Date(new Date(l.scheduledStart).getTime() + l.scheduledMinutes * 60000).toISOString(),
         backgroundColor: eventColor(l.status),
@@ -222,10 +235,11 @@ export function CalendarPage() {
         </Select>
         <Select aria-label="Môn học" value={subject} onChange={(e) => setSubject(e.target.value)} className="w-36">
           <option value="">Mọi môn</option>
-          <option value="Toán">Toán</option>
-          <option value="Lý">Lý</option>
-          <option value="Hóa">Hóa</option>
-          <option value="Tiếng Anh">Tiếng Anh</option>
+          {SUBJECTS.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
         </Select>
       </div>
 
@@ -252,7 +266,11 @@ export function CalendarPage() {
           dateClick={handleDateClick}
           eventClick={handleEventClick}
           events={events}
-          datesSet={(arg) => setRange({ from: arg.start.toISOString(), to: arg.end.toISOString() })}
+          datesSet={(arg) => {
+            const from = arg.start.toISOString();
+            const to = arg.end.toISOString();
+            setRange((prev) => (prev.from === from && prev.to === to ? prev : { from, to }));
+          }}
           height="auto"
         />
       </div>
@@ -276,7 +294,16 @@ export function CalendarPage() {
       ) : null}
 
       {dialog?.id ? (
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <Button
+            onClick={() => {
+              const found = (lessons.data?.items ?? []).find((l: LessonItem) => l.id === dialog.id);
+              if (found && found.status === 'scheduled') setCompleting(found);
+              else push('Chỉ hoàn thành buổi đang lên lịch.');
+            }}
+          >
+            Hoàn thành
+          </Button>
           <Button
             variant="danger"
             onClick={() =>
@@ -292,6 +319,8 @@ export function CalendarPage() {
           </Button>
         </div>
       ) : null}
+
+      {completing ? <CompleteLessonDialog lesson={completing} onClose={() => setCompleting(null)} /> : null}
     </Page>
   );
 }

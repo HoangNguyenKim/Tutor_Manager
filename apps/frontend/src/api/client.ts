@@ -72,7 +72,6 @@ export async function fetchHealth(): Promise<ApiResponse<HealthStatus>> {
 export interface StudentListParams {
   search?: string;
   status?: 'active' | 'archived' | 'all';
-  subject?: string;
   page?: number;
   pageSize?: number;
 }
@@ -82,7 +81,6 @@ export const studentsApi = {
     const q = new URLSearchParams();
     if (params.search) q.set('search', params.search);
     if (params.status) q.set('status', params.status);
-    if (params.subject) q.set('subject', params.subject);
     if (params.page) q.set('page', String(params.page));
     if (params.pageSize) q.set('pageSize', String(params.pageSize));
     const suffix = q.toString();

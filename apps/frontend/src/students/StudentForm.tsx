@@ -10,7 +10,6 @@ export interface StudentFormValues {
   phone: string;
   parentContact: string;
   grade: string;
-  subject: string;
   hourlyRateVnd: string;
   notes: string;
 }
@@ -21,7 +20,6 @@ export function toFormValues(s?: StudentDto): StudentFormValues {
     phone: s?.phone ?? '',
     parentContact: s?.parentContact ?? '',
     grade: s?.grade ?? '',
-    subject: s?.subject ?? '',
     hourlyRateVnd: s?.hourlyRateVnd?.toString() ?? '',
     notes: s?.notes ?? '',
   };
@@ -34,7 +32,6 @@ function toDto(v: StudentFormValues): CreateStudentDto {
     ...(v.phone.trim() ? { phone: v.phone.trim() } : {}),
     ...(v.parentContact.trim() ? { parentContact: v.parentContact.trim() } : {}),
     ...(v.grade.trim() ? { grade: v.grade.trim() } : {}),
-    ...(v.subject.trim() ? { subject: v.subject.trim() } : {}),
     ...(rate !== undefined ? { hourlyRateVnd: rate } : {}),
     ...(v.notes.trim() ? { notes: v.notes.trim() } : {}),
   };
@@ -91,15 +88,9 @@ export function StudentForm({
         <Label htmlFor="stu-name">Tên học sinh *</Label>
         <Input id="stu-name" value={values.name} onChange={set('name')} maxLength={120} placeholder="Nguyễn Văn A" />
       </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div>
-          <Label htmlFor="stu-grade">Khối lớp</Label>
-          <Input id="stu-grade" value={values.grade} onChange={set('grade')} maxLength={30} placeholder="10" />
-        </div>
-        <div>
-          <Label htmlFor="stu-subject">Môn học</Label>
-          <Input id="stu-subject" value={values.subject} onChange={set('subject')} maxLength={60} placeholder="Toán" />
-        </div>
+      <div>
+        <Label htmlFor="stu-grade">Khối lớp</Label>
+        <Input id="stu-grade" value={values.grade} onChange={set('grade')} maxLength={30} placeholder="10" />
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>

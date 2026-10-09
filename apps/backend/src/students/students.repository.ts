@@ -5,7 +5,6 @@ import { PrismaService } from '../db/prisma.service';
 export interface StudentListFilter {
   search?: string;
   status?: 'active' | 'archived' | 'all';
-  subject?: string;
   page: number;
   pageSize: number;
 }
@@ -15,11 +14,10 @@ export interface StudentListFilter {
 export class StudentsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  private where(filter: Pick<StudentListFilter, 'search' | 'status' | 'subject'>): Prisma.StudentWhereInput {
+  private where(filter: Pick<StudentListFilter, 'search' | 'status'>): Prisma.StudentWhereInput {
     const where: Prisma.StudentWhereInput = {};
     if (filter.status === 'active') where.isActive = true;
     else if (filter.status === 'archived') where.isActive = false;
-    if (filter.subject) where.subject = filter.subject;
     if (filter.search) {
       where.OR = [
         { name: { contains: filter.search } },

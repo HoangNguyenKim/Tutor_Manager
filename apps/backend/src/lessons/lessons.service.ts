@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import type { CreateLessonDto, CreateRecurrenceDto, ListLessonsQuery, UpdateLessonDto } from './dto/lesson.dto';
+import type { CompleteLessonDto, CreateLessonDto, CreateRecurrenceDto, ListLessonsQuery, UpdateLessonDto } from './dto/lesson.dto';
 import { LessonsRepository } from './lessons.repository';
-import { expandWeekly, findOverlaps, lessonEnd, resolveWallClock } from './schedule.utils';
+import { computeTimeBreakdown, computeTuitionVnd, expandWeekly, findOverlaps, lessonEnd, resolveWallClock } from './schedule.utils';
 
 const DEFAULT_TZ = 'Asia/Ho_Chi_Minh';
 
@@ -54,6 +54,7 @@ export class LessonsService {
       student: { connect: { id: dto.studentId } },
       scheduledStart: start,
       scheduledMinutes: dto.scheduledMinutes,
+      subject: dto.subject,
       billableMinutes: dto.scheduledMinutes,
       hourlyRateVnd: dto.hourlyRateVnd ?? 0,
       tuitionVnd: dto.hourlyRateVnd ?? 0,
@@ -84,6 +85,7 @@ export class LessonsService {
     return this.repo.update(id, {
       ...(dto.scheduledStart ? { scheduledStart: start } : {}),
       ...(dto.scheduledMinutes !== undefined ? { scheduledMinutes: minutes, billableMinutes: minutes } : {}),
+      ...(dto.subject ? { subject: dto.subject } : {}),
       ...(dto.timeZone ? { timeZone: dto.timeZone } : {}),
     });
   }
@@ -96,6 +98,58 @@ export class LessonsService {
       throw new ConflictException({ code: 'BUSINESS_RULE', message: 'Completed lessons cannot be cancelled' });
     }
     return this.repo.update(id, { status: 'cancelled' });
+  }
+
+  /**
+   * Complete a scheduled lesson: snapshot actual/bonus/billable minutes and
+   * tuition from the preserved hourly rate. Re-completing is a 409 that
+   * preserves the record — never a silent overwrite.
+   */
+  async complete(id: string, dto: CompleteLessonDto) {
+    const lesson = await this.get(id);
+    if (lesson.status === 'completed') {
+      throw new ConflictException({ code: 'CONFLICT', message: 'Lesson already completed', details: { id } });
+    }
+    if (lesson.status === 'cancelled') {
+      throw new ConflictException({ code: 'BUSINESS_RULE', message: 'Cancelled lessons cannot be completed' });
+    }
+    const policy = dto.billingPolicy ?? lesson.billingPolicy;
+    const bonusBillable = dto.bonusBillable ?? lesson.bonusBillable;
+    const breakdown = computeTimeBreakdown(lesson.scheduledMinutes, dto.actualMinutes, policy, bonusBillable);
+    const tuitionVnd = computeTuitionVnd(lesson.hourlyRateVnd, breakdown.billableMinutes);
+    return this.repo.update(id, {
+      actualMinutes: dto.actualMinutes,
+      bonusMinutes: breakdown.bonusMinutes,
+      bonusBillable,
+      billingPolicy: policy,
+      billableMinutes: breakdown.billableMinutes,
+      tuitionVnd,
+      status: 'completed',
+    });
+  }
+
+  /**
+   * Safe edit of a completed lesson: only notes-adjacent scheduling fields are
+   * locked; duration corrections re-run the engine against the preserved rate.
+   */
+  async correctCompleted(id: string, dto: { actualMinutes?: number; bonusBillable?: boolean }) {
+    const lesson = await this.get(id);
+    if (lesson.status !== 'completed' || lesson.actualMinutes === null) {
+      throw new ConflictException({ code: 'BUSINESS_RULE', message: 'Only completed lessons can be corrected' });
+    }
+    const actual = dto.actualMinutes ?? lesson.actualMinutes;
+    if (!Number.isInteger(actual) || actual < 1 || actual > 480) {
+      throw new BadRequestException({ code: 'VALIDATION', message: 'actualMinutes must be an integer 1-480' });
+    }
+    const bonusBillable = dto.bonusBillable ?? lesson.bonusBillable;
+    const breakdown = computeTimeBreakdown(lesson.scheduledMinutes, actual, lesson.billingPolicy, bonusBillable);
+    return this.repo.update(id, {
+      actualMinutes: actual,
+      bonusMinutes: breakdown.bonusMinutes,
+      bonusBillable,
+      billableMinutes: breakdown.billableMinutes,
+      tuitionVnd: computeTuitionVnd(lesson.hourlyRateVnd, breakdown.billableMinutes),
+    });
   }
 
   async createRecurrence(dto: CreateRecurrenceDto) {
@@ -133,6 +187,7 @@ export class LessonsService {
         student: { connect: { id: dto.studentId } },
         scheduledStart: start,
         scheduledMinutes: dto.scheduledMinutes,
+        subject: dto.subject,
         billableMinutes: dto.scheduledMinutes,
         hourlyRateVnd: dto.hourlyRateVnd ?? 0,
         tuitionVnd: dto.hourlyRateVnd ?? 0,

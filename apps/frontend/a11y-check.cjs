@@ -25,6 +25,8 @@ const expectedRoutes = ['dashboard', 'students', 'calendar', 'hours', 'tuition',
 const pageSources = {
   students: read('students/StudentsPage.tsx'),
   calendar: read('calendar/CalendarPage.tsx'),
+  hours: read('hours/HoursPage.tsx'),
+  tuition: read('tuition/TuitionPage.tsx'),
 };
 for (const r of expectedRoutes) {
   const src = pageSources[r] ?? pages;
@@ -45,6 +47,6 @@ check('decorative icons hidden', sidebar.includes('aria-hidden'));
 check('responsive: sidebar collapses + mobile nav', app.includes('hidden w-60') && app.includes('sm:hidden'));
 check('responsive: grid breakpoints', pages.includes('sm:grid-cols-2') && pages.includes('xl:grid-cols-4'));
 check('dark theme toggle + classes', header.includes('useTheme') && css.includes('dark:'));
-check('no console.log in src', !/\bconsole\.(log|error|warn)\b/.test(app + sidebar + header + pages + read('students/StudentsPage.tsx') + read('calendar/CalendarPage.tsx')));
+check('no console.log in src', !/\bconsole\.(log|error|warn)\b/.test(app + sidebar + header + pages + read('students/StudentsPage.tsx') + read('calendar/CalendarPage.tsx') + read('hours/HoursPage.tsx') + read('tuition/TuitionPage.tsx')));
 
 process.exit(failures === 0 ? 0 : 1);

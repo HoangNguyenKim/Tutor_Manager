@@ -22,11 +22,6 @@ export class UpdateStudentDto {
   grade?: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(60)
-  subject?: string;
-
-  @IsOptional()
   @IsInt()
   @Min(0)
   hourlyRateVnd?: number;

@@ -1,5 +1,5 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Query } from '@nestjs/common';
-import { CreateLessonDto, CreateRecurrenceDto, ListLessonsQuery, UpdateLessonDto } from './dto/lesson.dto';
+import { CompleteLessonDto, CorrectLessonDto, CreateLessonDto, CreateRecurrenceDto, ListLessonsQuery, UpdateLessonDto } from './dto/lesson.dto';
 import { LessonsService } from './lessons.service';
 
 @Controller('lessons')
@@ -31,6 +31,17 @@ export class LessonsController {
   @HttpCode(HttpStatus.OK)
   async cancel(@Param('id') id: string) {
     return { ok: true, data: await this.service.cancel(id) };
+  }
+
+  @Post(':id/complete')
+  @HttpCode(HttpStatus.OK)
+  async complete(@Param('id') id: string, @Body() dto: CompleteLessonDto) {
+    return { ok: true, data: await this.service.complete(id, dto) };
+  }
+
+  @Patch(':id/correct')
+  async correct(@Param('id') id: string, @Body() dto: CorrectLessonDto) {
+    return { ok: true, data: await this.service.correctCompleted(id, dto) };
   }
 
   @Post('recurrence')

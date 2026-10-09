@@ -26,13 +26,16 @@ export interface ApiResponse<T> {
 
 export type LessonStatus = 'scheduled' | 'completed' | 'cancelled';
 
+export const SUBJECTS = ['Toán', 'Văn', 'Anh', 'Sinh', 'Hóa', 'Lý'] as const;
+
+export type Subject = (typeof SUBJECTS)[number];
+
 export interface StudentDto {
   id: string;
   name: string;
   phone?: string | null;
   parentContact?: string | null;
   grade?: string | null;
-  subject?: string | null;
   hourlyRateVnd?: number | null;
   notes?: string | null;
   isActive: boolean;
@@ -45,7 +48,6 @@ export interface CreateStudentDto {
   phone?: string;
   parentContact?: string;
   grade?: string;
-  subject?: string;
   hourlyRateVnd?: number;
   notes?: string;
 }
@@ -55,7 +57,6 @@ export interface UpdateStudentDto {
   phone?: string;
   parentContact?: string;
   grade?: string;
-  subject?: string;
   hourlyRateVnd?: number;
   notes?: string;
 }
@@ -72,15 +73,30 @@ export interface LessonItemDto {
   studentId: string;
   scheduledStart: string;
   scheduledMinutes: number;
+  subject: Subject;
+  actualMinutes?: number | null;
+  bonusMinutes: number;
+  bonusBillable: boolean;
+  billingPolicy: 'actual' | 'planned';
+  billableMinutes: number;
+  hourlyRateVnd: number;
+  tuitionVnd: number;
   status: 'scheduled' | 'completed' | 'cancelled';
   timeZone: string;
-  student?: { id: string; name: string; subject?: string | null };
+  student?: { id: string; name: string };
+}
+
+export interface CompleteLessonDto {
+  actualMinutes: number;
+  bonusBillable?: boolean;
+  billingPolicy?: 'actual' | 'planned';
 }
 
 export interface CreateLessonDto {
   studentId: string;
   scheduledStart: string;
   scheduledMinutes: number;
+  subject: Subject;
   timeZone?: string;
   hourlyRateVnd?: number;
 }
@@ -88,11 +104,50 @@ export interface CreateLessonDto {
 export interface UpdateLessonDto {
   scheduledStart?: string;
   scheduledMinutes?: number;
+  subject?: Subject;
   timeZone?: string;
 }
 
 export interface LessonListResponse {
   total: number;
   items: LessonItemDto[];
+}
+
+export interface StatementLessonDto {
+  id: string;
+  scheduledStart: string;
+  subject: Subject;
+  scheduledMinutes: number;
+  actualMinutes: number | null;
+  bonusMinutes: number;
+  bonusBillable: boolean;
+  billableMinutes: number;
+  hourlyRateVnd: number;
+  tuitionVnd: number;
+  status: 'scheduled' | 'completed' | 'cancelled';
+}
+
+export interface MonthlyStatementDto {
+  studentId: string;
+  year: number;
+  month: number;
+  lessons: StatementLessonDto[];
+  lessonTotalVnd: number;
+  adjustments: { id: string; amountVnd: number; reason: string }[];
+  adjustmentTotalVnd: number;
+  amountDueVnd: number;
+  payments: { id: string; amountVnd: number; paidAt: string }[];
+  paidTotalVnd: number;
+  balanceVnd: number;
+}
+
+export interface PaymentDto {
+  id: string;
+  studentId: string;
+  amountVnd: number;
+  paidAt: string;
+  note?: string | null;
+  idempotencyKey?: string | null;
+  corrections: { id: string; previousAmountVnd: number; newAmountVnd: number; reason: string; createdAt: string }[];
 }
 

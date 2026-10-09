@@ -16,7 +16,6 @@ model Student {
   phone     String?
   parentContact String?
   grade     String?
-  subject   String?
   hourlyRateVnd Int?
   notes     String?
   isActive  Boolean  @default(true)
@@ -37,15 +36,26 @@ enum LessonStatus {
   cancelled
 }
 
+enum BillingPolicy {
+  actual
+  planned
+}
+
 model Lesson {
   id               String       @id @default(cuid())
   studentId        String
   student          Student      @relation(fields: [studentId], references: [id], onDelete: Restrict)
   scheduledStart   DateTime
   scheduledMinutes Int
+  // Subject taught in this lesson (a student takes many subjects across lessons).
+  subject          String
   actualMinutes    Int?
   bonusMinutes     Int          @default(0)
+  // True = bonus minutes are charged; false = bonus is free.
+  bonusBillable    Boolean      @default(false)
   billableMinutes  Int
+  // Which minutes tuition is billed on: actual (default) or planned.
+  billingPolicy    BillingPolicy @default(actual)
   // Historical rate snapshot: preserved at completion, never recalculated.
   hourlyRateVnd    Int
   tuitionVnd       Int
@@ -63,6 +73,7 @@ model Lesson {
 
   @@index([studentId, scheduledStart])
   @@index([status, scheduledStart])
+  @@index([subject, scheduledStart])
   @@index([deletedAt])
   @@index([recurrenceId])
 }
@@ -94,10 +105,27 @@ model Payment {
   amountVnd Int
   paidAt    DateTime
   note      String?
+  // Client-supplied key: repeated requests with the same key return the
+  // original row instead of creating a duplicate.
+  idempotencyKey String?  @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  corrections PaymentCorrection[]
+
   @@index([studentId, paidAt])
+}
+
+model PaymentCorrection {
+  id            String   @id @default(cuid())
+  paymentId     String
+  payment       Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  previousAmountVnd Int
+  newAmountVnd  Int
+  reason        String
+  createdAt     DateTime @default(now())
+
+  @@index([paymentId, createdAt])
 }
 
 model TuitionAdjustment {

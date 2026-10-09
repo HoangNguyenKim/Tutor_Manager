@@ -6,9 +6,9 @@ import { applyPendingMigrations, resolveMigrationsDir } from '../src/db/migratio
 
 // Fictional demo data only — never real student personal data.
 const STUDENTS = [
-  { name: 'Nguyen Van Minh (demo)', phone: '0900000001', notes: 'Toán lớp 10' },
-  { name: 'Tran Thi Hoa (demo)', phone: '0900000002', notes: 'Tiếng Anh lớp 8' },
-  { name: 'Le Van Bao (demo)', phone: '0900000003', notes: 'Lý lớp 11' },
+  { name: 'Nguyen Van Minh (demo)', phone: '0900000001', notes: 'Lớp 10' },
+  { name: 'Tran Thi Hoa (demo)', phone: '0900000002', notes: 'Lớp 8' },
+  { name: 'Le Van Bao (demo)', phone: '0900000003', notes: 'Lớp 11' },
 ];
 
 async function main() {
@@ -35,6 +35,7 @@ async function main() {
             studentId: student.id,
             scheduledStart: new Date(Date.now() + 86400000),
             scheduledMinutes: 90,
+            subject: 'Toán',
             billableMinutes: 90,
             hourlyRateVnd: 200000,
             tuitionVnd: 300000,

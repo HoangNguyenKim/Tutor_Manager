@@ -1,14 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '../api/client';
 
+import type { CompleteLessonDto, Subject } from '@tutor-manager/shared';
+
 export interface LessonItem {
   id: string;
   studentId: string;
   scheduledStart: string;
   scheduledMinutes: number;
+  subject: Subject;
+  actualMinutes?: number | null;
+  bonusMinutes: number;
+  bonusBillable: boolean;
+  billingPolicy: 'actual' | 'planned';
+  billableMinutes: number;
+  hourlyRateVnd: number;
+  tuitionVnd: number;
   status: 'scheduled' | 'completed' | 'cancelled';
   timeZone: string;
-  student?: { id: string; name: string; subject?: string | null };
+  student?: { id: string; name: string };
 }
 
 export interface LessonListParams {
@@ -48,7 +58,7 @@ function useInvalidateLessons() {
 export function useCreateLesson() {
   const invalidate = useInvalidateLessons();
   return useMutation({
-    mutationFn: (dto: { studentId: string; scheduledStart: string; scheduledMinutes: number; timeZone?: string }) =>
+    mutationFn: (dto: { studentId: string; scheduledStart: string; scheduledMinutes: number; subject: Subject; timeZone?: string }) =>
       apiFetch<LessonItem>('/api/lessons', { method: 'POST', body: JSON.stringify(dto) }),
     onSuccess: () => invalidate(),
   });
@@ -57,7 +67,7 @@ export function useCreateLesson() {
 export function useUpdateLesson() {
   const invalidate = useInvalidateLessons();
   return useMutation({
-    mutationFn: ({ id, dto }: { id: string; dto: { scheduledStart?: string; scheduledMinutes?: number } }) =>
+    mutationFn: ({ id, dto }: { id: string; dto: { scheduledStart?: string; scheduledMinutes?: number; subject?: Subject } }) =>
       apiFetch<LessonItem>(`/api/lessons/${id}`, { method: 'PATCH', body: JSON.stringify(dto) }),
     onSuccess: () => invalidate(),
   });
@@ -67,6 +77,15 @@ export function useCancelLesson() {
   const invalidate = useInvalidateLessons();
   return useMutation({
     mutationFn: (id: string) => apiFetch<LessonItem>(`/api/lessons/${id}/cancel`, { method: 'POST' }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useCompleteLesson() {
+  const invalidate = useInvalidateLessons();
+  return useMutation({
+    mutationFn: ({ id, dto }: { id: string; dto: CompleteLessonDto }) =>
+      apiFetch<LessonItem>(`/api/lessons/${id}/complete`, { method: 'POST', body: JSON.stringify(dto) }),
     onSuccess: () => invalidate(),
   });
 }

@@ -13,12 +13,11 @@ import { Page } from '../layout/Page';
 import { useToast } from '../toast';
 import { StudentForm } from './StudentForm';
 
-type SortKey = 'name' | 'subject' | 'rate';
+type SortKey = 'name' | 'rate';
 
 function sortItems(items: StudentDto[], key: SortKey): StudentDto[] {
   const copy = [...items];
   if (key === 'name') copy.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
-  if (key === 'subject') copy.sort((a, b) => (a.subject ?? '').localeCompare(b.subject ?? '', 'vi'));
   if (key === 'rate') copy.sort((a, b) => (b.hourlyRateVnd ?? -1) - (a.hourlyRateVnd ?? -1));
   return copy;
 }
@@ -59,7 +58,6 @@ function StudentDetail({ id, onClose, onEdit }: { id: string; onClose: () => voi
         <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
           <div><dt className="text-slate-500">Tên</dt><dd className="font-medium">{data.student.name}</dd></div>
           <div><dt className="text-slate-500">Trạng thái</dt><dd>{data.student.isActive ? <Badge tone="success">Đang học</Badge> : <Badge tone="neutral">Đã lưu trữ</Badge>}</dd></div>
-          <div><dt className="text-slate-500">Môn</dt><dd>{data.student.subject ?? '—'}</dd></div>
           <div><dt className="text-slate-500">Khối</dt><dd>{data.student.grade ?? '—'}</dd></div>
           <div><dt className="text-slate-500">Học phí giờ</dt><dd>{formatVnd(data.student.hourlyRateVnd)}</dd></div>
           <div><dt className="text-slate-500">Điện thoại</dt><dd>{data.student.phone ?? '—'}</dd></div>
@@ -88,7 +86,6 @@ export function StudentsPage() {
     return () => window.clearTimeout(h);
   }, [search]);
   const [status, setStatus] = useState<'active' | 'archived' | 'all'>('active');
-  const [subject, setSubject] = useState('');
   const [sort, setSort] = useState<SortKey>('name');
   const [createOpen, setCreateOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -98,7 +95,6 @@ export function StudentsPage() {
   const list = useStudents({
     search: debounced || undefined,
     status,
-    subject: subject.trim() || undefined,
     page: 1,
     pageSize: 50,
   });
@@ -129,20 +125,13 @@ export function StudentsPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Select aria-label="Môn học" value={subject} onChange={(e) => setSubject(e.target.value)} className="w-32">
-          <option value="">Mọi môn</option>
-          <option value="Toán">Toán</option>
-          <option value="Lý">Lý</option>
-          <option value="Hóa">Hóa</option>
-          <option value="Tiếng Anh">Tiếng Anh</option>
-        </Select>
         <Select aria-label="Trạng thái" value={status} onChange={(e) => setStatus(e.target.value as typeof status)} className="w-32">
           <option value="active">Đang học</option>
           <option value="archived">Lưu trữ</option>
           <option value="all">Tất cả</option>
         </Select>
-        <Button variant="secondary" onClick={() => setSort((s) => (s === 'name' ? 'subject' : s === 'subject' ? 'rate' : 'name'))} title="Đổi sắp xếp">
-          <ArrowDownUp aria-hidden="true" /> {sort === 'name' ? 'Tên' : sort === 'subject' ? 'Môn' : 'Học phí'}
+        <Button variant="secondary" onClick={() => setSort((s) => (s === 'name' ? 'rate' : 'name'))} title="Đổi sắp xếp">
+          <ArrowDownUp aria-hidden="true" /> {sort === 'name' ? 'Tên' : 'Học phí'}
         </Button>
       </div>
 
@@ -163,7 +152,6 @@ export function StudentsPage() {
             <thead className="bg-slate-50 dark:bg-slate-800">
               <tr>
                 <th scope="col" className="px-4 py-2 font-medium">Tên</th>
-                <th scope="col" className="px-4 py-2 font-medium">Môn</th>
                 <th scope="col" className="px-4 py-2 font-medium">Khối</th>
                 <th scope="col" className="px-4 py-2 font-medium">Học phí giờ</th>
                 <th scope="col" className="px-4 py-2 font-medium">Trạng thái</th>
@@ -174,7 +162,6 @@ export function StudentsPage() {
               {items.map((s) => (
                 <tr key={s.id} className="border-t border-slate-200 dark:border-slate-800">
                   <td className="px-4 py-2 font-medium">{s.name}</td>
-                  <td className="px-4 py-2">{s.subject ?? '—'}</td>
                   <td className="px-4 py-2">{s.grade ?? '—'}</td>
                   <td className="px-4 py-2">{formatVnd(s.hourlyRateVnd)}</td>
                   <td className="px-4 py-2">
