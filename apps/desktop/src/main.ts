@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { spawn, type ChildProcess } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,6 +11,9 @@ const BACKEND_URL = `http://${BACKEND_HOST}:${BACKEND_PORT}`;
 const VITE_DEV_URL = process.env['VITE_DEV_URL'] ?? 'http://127.0.0.1:5173';
 const START_BACKEND = process.env['START_BACKEND'] !== '0';
 const BACKEND_WAIT_MS = Number(process.env['BACKEND_WAIT_MS'] ?? '30000');
+// Install token: generated per launch, held in memory only, never written to disk.
+// Renderer receives it via the sender-validated IPC bridge (ADR-0002).
+const LOCAL_TOKEN = process.env['LOCAL_TOKEN'] ?? randomBytes(32).toString('hex');
 
 let mainWindow: BrowserWindow | undefined;
 let backend: ChildProcess | undefined;
@@ -82,6 +86,7 @@ function startBackend(): void {
       HOST: BACKEND_HOST,
       PORT: String(BACKEND_PORT),
       DATA_DIR: dataDir,
+      LOCAL_TOKEN,
     },
     stdio: app.isPackaged ? 'ignore' : 'inherit',
     windowsHide: true,
@@ -198,6 +203,10 @@ function registerIpc(): void {
   ipcMain.handle('tutor-manager:get-version', (event) => {
     assertTrustedSender(event.senderFrame);
     return app.getVersion();
+  });
+  ipcMain.handle('tutor-manager:get-auth-token', (event) => {
+    assertTrustedSender(event.senderFrame);
+    return LOCAL_TOKEN;
   });
   ipcMain.handle('tutor-manager:ping', async (event) => {
     assertTrustedSender(event.senderFrame);

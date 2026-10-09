@@ -26,6 +26,7 @@ model Student {
   lessons            Lesson[]
   payments           Payment[]
   tuitionAdjustments TuitionAdjustment[]
+  recurrenceRules    RecurrenceRule[]
 
   @@index([isActive, name])
 }
@@ -48,6 +49,11 @@ model Lesson {
   // Historical rate snapshot: preserved at completion, never recalculated.
   hourlyRateVnd    Int
   tuitionVnd       Int
+  // IANA zone the wall-clock time was entered in; scheduledStart stored as UTC.
+  timeZone         String       @default("Asia/Ho_Chi_Minh")
+  // Groups lessons generated from one RecurrenceRule; null for one-offs.
+  recurrenceId     String?
+  recurrence       RecurrenceRule? @relation(fields: [recurrenceId], references: [id], onDelete: SetNull)
   status           LessonStatus @default(scheduled)
   deletedAt        DateTime?
   createdAt        DateTime     @default(now())
@@ -58,6 +64,27 @@ model Lesson {
   @@index([studentId, scheduledStart])
   @@index([status, scheduledStart])
   @@index([deletedAt])
+  @@index([recurrenceId])
+}
+
+model RecurrenceRule {
+  id            String   @id @default(cuid())
+  studentId     String
+  student       Student  @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  weekday       Int
+  startTime     String
+  scheduledMinutes Int
+  timeZone      String   @default("Asia/Ho_Chi_Minh")
+  validFrom     DateTime
+  validUntil    DateTime?
+  hourlyRateVnd Int
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  lessons Lesson[]
+
+  @@index([studentId, isActive])
 }
 
 model Payment {

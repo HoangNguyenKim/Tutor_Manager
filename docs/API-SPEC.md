@@ -36,13 +36,14 @@ Proves the secure integration: bearer-token auth + global DTO validation. Requir
 interface StudentDto { id: string; name: string; phone?: string; notes?: string; createdAt: string }
 ```
 
-## `GET /api/lessons` / `POST /api/lessons` / `POST /api/lessons/:id/complete` — planned
+## `GET /api/lessons` / `POST /api/lessons` — implemented
 
-Durations integer minutes, money integer VND. Completing snapshots tuition.
-
-- `POST /api/lessons`: body `CreateLessonDto { studentId: string, scheduledStart: string, scheduledMinutes: number, tuitionVnd: number }`. Response `201`.
-- `POST /api/lessons/:id/complete`: body `CompleteLessonDto { actualMinutes: number, bonusMinutes?: number }`. Response `200`, or `409 CONFLICT` if already completed (record preserved).
-- Errors: `400 VALIDATION`, `404 NOT_FOUND`, `422 BUSINESS_RULE`.
+- `GET /api/lessons?from=&to=&studentId=&subject=&status=scheduled|completed|cancelled|all`: list with student info, ordered by start. Response `200`.
+- `POST /api/lessons`: body `CreateLessonDto { studentId*, scheduledStart* (ISO UTC), scheduledMinutes* (1–480), timeZone?, hourlyRateVnd? }`. Overlap → `409 CONFLICT` with `conflictingIds`. Response `201`.
+- `PATCH /api/lessons/:id`: reschedule (scheduled only); overlap → `409`. Completed/cancelled → `409 BUSINESS_RULE`.
+- `POST /api/lessons/:id/cancel`: cancel keeps the row (history preserved). Completed cannot be cancelled. Idempotent.
+- `POST /api/lessons/recurrence`: body `{ studentId*, weekday 0–6, startTime HH:mm, scheduledMinutes, timeZone?, validFrom*, validUntil?, hourlyRateVnd? }`. Generates weekly UTC instants locally (DST-stable via wall-clock resolve), skips overlaps. Response `{ rule, created, skipped }`.
+- Timezone: `scheduledStart` stored UTC; `timeZone` (default `Asia/Ho_Chi_Minh`) records entry zone.
 
 ```ts
 interface LessonDto { id: string; studentId: string; scheduledStart: string; scheduledMinutes: number; actualMinutes?: number; bonusMinutes: number; billableMinutes: number; tuitionVnd: number; status: 'scheduled' | 'completed' | 'cancelled' }

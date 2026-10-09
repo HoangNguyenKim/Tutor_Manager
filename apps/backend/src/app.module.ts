@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { HealthModule } from './health/health.module';
+import { LessonsModule } from './lessons/lessons.module';
 import { StudentsModule } from './students/students.module';
 import { PrismaModule } from './db/prisma.module';
 import { ConfigModule } from './config.module';
@@ -10,7 +11,7 @@ import { LoggingInterceptor } from './common/logging.interceptor';
 import { BACKEND_CONFIG } from './config.provider';
 
 @Module({
-  imports: [ConfigModule, PrismaModule, HealthModule, StudentsModule],
+  imports: [ConfigModule, PrismaModule, HealthModule, StudentsModule, LessonsModule],
   providers: [
     { provide: APP_GUARD, useClass: LocalAuthGuard },
     { provide: APP_FILTER, useClass: ApiExceptionFilter },

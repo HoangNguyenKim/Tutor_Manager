@@ -77,7 +77,7 @@ apps/backend/src/
 ## Electron — main vs preload
 
 - `apps/desktop/src/main.ts` (privileged): spawns `backend/dist/main.js`, creates `BrowserWindow` with `contextIsolation: true, nodeIntegration: false`, kills backend on quit. Owns OAuth window flow if ever needed — tokens stay in main/backend.
-- `apps/desktop/src/preload.ts` (narrow bridge): exposes only `window.tutorManager.getBackendUrl()` / `getVersion()` / `pingBackend()` via `contextBridge` + `ipcRenderer.invoke`. Main validates every IPC sender frame against the allowed app URL. No `ipcRenderer` passthrough, no `shell`, no tokens, no SQL.
+- `apps/desktop/src/preload.ts` (narrow bridge): exposes only `window.tutorManager.getBackendUrl()` / `getVersion()` / `getAuthToken()` / `pingBackend()` via `contextBridge` + `ipcRenderer.invoke`. Main validates every IPC sender frame against the allowed app URL. The install token is generated per launch in main, held in memory only, and passed to the backend via env — never written to disk, never in localStorage. No `ipcRenderer` passthrough, no `shell`, no SQL.
 - Renderer never sees `process`, `require`, or OAuth secrets. Any new bridge method needs an ADR update.
 
 ## SQLite persistence

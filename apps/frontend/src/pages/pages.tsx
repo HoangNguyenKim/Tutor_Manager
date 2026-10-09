@@ -1,12 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Plus } from 'lucide-react';
 import { vi } from '../i18n';
 import { Badge } from '../components/Badge';
 import { Button } from '../components/Button';
 import { Card, CardTitle } from '../components/Card';
-import { Dialog } from '../components/Dialog';
 import { EmptyState, Skeleton } from '../components/Feedback';
-import { Input, Label } from '../components/Field';
+import { Label } from '../components/Field';
 import { Table } from '../components/Table';
 import { Page } from '../layout/Page';
 import { useToast } from '../toast';
@@ -45,54 +43,6 @@ export function DashboardPage() {
             ))}
       </div>
       <EmptyState title={vi.empty} hint="Dữ liệu sẽ hiện khi có học sinh và buổi học." />
-    </Page>
-  );
-}
-
-export function StudentsPage() {
-  const [open, setOpen] = useState(false);
-  const { push } = useToast();
-  return (
-    <Page
-      title={vi.students}
-      actions={
-        <Button onClick={() => setOpen(true)}>
-          <Plus aria-hidden="true" /> {vi.add}
-        </Button>
-      }
-    >
-      <Table head={['Tên', 'Trạng thái']} rows={[]} />
-      <EmptyState title={vi.empty} hint="Nhấn Thêm mới để tạo hồ sơ học sinh đầu tiên." />
-      <Dialog open={open} onClose={() => setOpen(false)} title={`${vi.add} — ${vi.students}`}>
-        <form
-          className="flex flex-col gap-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setOpen(false);
-            push('Đã lưu (bản demo — API học sinh ở bước sau).');
-          }}
-        >
-          <div>
-            <Label htmlFor="student-name">Tên học sinh</Label>
-            <Input id="student-name" name="name" required maxLength={120} placeholder="Nguyễn Văn A" />
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
-              {vi.cancel}
-            </Button>
-            <Button type="submit">{vi.save}</Button>
-          </div>
-        </form>
-      </Dialog>
-    </Page>
-  );
-}
-
-export function CalendarPage() {
-  return (
-    <Page title={vi.calendar}>
-      <Badge tone="info">Lịch học theo tuần — FullCalendar ở bước sau</Badge>
-      <EmptyState title={vi.empty} />
     </Page>
   );
 }

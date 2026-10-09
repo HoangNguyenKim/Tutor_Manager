@@ -27,3 +27,4 @@ pnpm --filter @tutor-manager/desktop smoke
 
 Env files: copy `.env.example` to `.env` per app as needed.
 Ports: frontend $5173$, backend $3001$ on $127.0.0.1$ only.
+Browser dev needs `VITE_DEV_TOKEN` in `apps/frontend/.env` matching backend `LOCAL_TOKEN` (protected APIs require Bearer auth; packaged app gets the token via the preload bridge instead).

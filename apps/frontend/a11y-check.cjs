@@ -22,8 +22,13 @@ const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 const distHtml = fs.readFileSync(path.join(__dirname, 'dist', 'index.html'), 'utf8');
 
 const expectedRoutes = ['dashboard', 'students', 'calendar', 'hours', 'tuition', 'reports', 'settings'];
+const pageSources = {
+  students: read('students/StudentsPage.tsx'),
+  calendar: read('calendar/CalendarPage.tsx'),
+};
 for (const r of expectedRoutes) {
-  check(`route renders: ${r}`, app.includes(`route === '${r}'`) && pages.includes(`export function ${r[0].toUpperCase()}${r.slice(1)}Page`));
+  const src = pageSources[r] ?? pages;
+  check(`route renders: ${r}`, app.includes(`route === '${r}'`) && src.includes(`export function ${r[0].toUpperCase()}${r.slice(1)}Page`));
 }
 check('html lang="vi"', html.includes('lang="vi"') && distHtml.includes('lang="vi"'));
 check('skip link', page.includes('SkipLink') && app.includes('<SkipLink') && page.includes('href="#main"'));
@@ -34,12 +39,12 @@ check('dialog role + aria-modal + esc', dialog.includes('role="dialog"') && dial
 check('toast aria-live', toast.includes('aria-live'));
 check('alert role in error boundary', read('components/ErrorBoundary.tsx').includes('role="alert"'));
 check('focus-visible styles', css.includes(':focus-visible'));
-check('labels tied to inputs', pages.includes('htmlFor="student-name"') && pages.includes('id="student-name"'));
+check('labels tied to inputs', read('students/StudentForm.tsx').includes('htmlFor="stu-name"') && read('students/StudentForm.tsx').includes('id="stu-name"'));
 check('icon-only button has label', header.includes('aria-label={vi.theme}'));
 check('decorative icons hidden', sidebar.includes('aria-hidden'));
 check('responsive: sidebar collapses + mobile nav', app.includes('hidden w-60') && app.includes('sm:hidden'));
 check('responsive: grid breakpoints', pages.includes('sm:grid-cols-2') && pages.includes('xl:grid-cols-4'));
 check('dark theme toggle + classes', header.includes('useTheme') && css.includes('dark:'));
-check('no console.log in src', !/\bconsole\.(log|error|warn)\b/.test(app + sidebar + header + pages));
+check('no console.log in src', !/\bconsole\.(log|error|warn)\b/.test(app + sidebar + header + pages + read('students/StudentsPage.tsx') + read('calendar/CalendarPage.tsx')));
 
 process.exit(failures === 0 ? 0 : 1);

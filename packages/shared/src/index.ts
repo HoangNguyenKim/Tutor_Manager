@@ -67,3 +67,32 @@ export interface StudentListResponse {
   items: StudentDto[];
 }
 
+export interface LessonItemDto {
+  id: string;
+  studentId: string;
+  scheduledStart: string;
+  scheduledMinutes: number;
+  status: 'scheduled' | 'completed' | 'cancelled';
+  timeZone: string;
+  student?: { id: string; name: string; subject?: string | null };
+}
+
+export interface CreateLessonDto {
+  studentId: string;
+  scheduledStart: string;
+  scheduledMinutes: number;
+  timeZone?: string;
+  hourlyRateVnd?: number;
+}
+
+export interface UpdateLessonDto {
+  scheduledStart?: string;
+  scheduledMinutes?: number;
+  timeZone?: string;
+}
+
+export interface LessonListResponse {
+  total: number;
+  items: LessonItemDto[];
+}
+
