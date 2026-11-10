@@ -8,6 +8,9 @@
     "node": ">=20"
   },
   "scripts": {
+    "start": "pnpm build && pnpm --filter @tutor-manager/desktop start",
+    "start:dev": "concurrently \"pnpm dev:frontend\" \"pnpm dev:backend\" \"pnpm --filter @tutor-manager/desktop start\"",
+
     "dev:frontend": "pnpm --filter @tutor-manager/frontend dev",
     "dev:backend": "pnpm --filter @tutor-manager/backend start:dev",
     "dev:desktop": "pnpm --filter @tutor-manager/desktop start",

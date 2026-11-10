@@ -32,15 +32,22 @@ check('production frontend path', mainSrc.includes('resourcesPath') && mainSrc.i
 check('IPC sender validation', mainSrc.includes('assertTrustedSender'));
 
 const child = spawn(process.execPath, [backendEntry], { stdio: 'ignore', windowsHide: true });
-setTimeout(async () => {
-  try {
-    const res = await fetch('http://127.0.0.1:3001/api/health');
-    check('backend health 200', res.ok);
-    child.kill();
-    process.exit(failures === 0 ? 0 : 1);
-  } catch (e) {
-    check(`backend health reachable (${e.message})`, false);
-    child.kill();
-    process.exit(1);
+async function waitHealth(timeoutMs) {
+  if (timeoutMs === undefined) timeoutMs = 30000;
+  const started = Date.now();
+  for (;;) {
+    try {
+      const res = await fetch('http://127.0.0.1:3001/api/health');
+      if (res.ok) return true;
+    } catch {
+      // retry until timeout
+    }
+    if (Date.now() - started > timeoutMs) return false;
+    await new Promise((r) => setTimeout(r, 500));
   }
-}, 6000);
+}
+waitHealth().then((ok) => {
+  check('backend health 200', ok);
+  child.kill();
+  process.exit(failures === 0 && ok ? 0 : 1);
+});

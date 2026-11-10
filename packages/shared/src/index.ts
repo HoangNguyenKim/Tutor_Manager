@@ -151,3 +151,36 @@ export interface PaymentDto {
   corrections: { id: string; previousAmountVnd: number; newAmountVnd: number; reason: string; createdAt: string }[];
 }
 
+export interface OverviewDto {
+  range: { from: string; to: string };
+  activeStudents: number;
+  scheduledLessons: number;
+  completedLessons: number;
+  plannedMinutes: number;
+  actualMinutes: number;
+  bonusMinutes: number;
+  billableMinutes: number;
+  tuitionVnd: number;
+  collectedVnd: number;
+  outstandingVnd: number;
+  upcoming: { id: string; studentId: string; studentName: string; subject: Subject; scheduledStart: string; scheduledMinutes: number }[];
+}
+
+export interface MonthlyReportDto {
+  year: number;
+  month: number;
+  students: { studentId: string; studentName: string; lessons: number; minutes: number; tuitionVnd: number; paidVnd: number }[];
+  totals: { lessons: number; tuitionVnd: number; collectedVnd: number };
+}
+
+export interface BonusReportDto {
+  range: { from: string; to: string };
+  students: { studentId: string; studentName: string; bonusMinutes: number; billableBonusMinutes: number }[];
+}
+
+export interface PaymentReportDto {
+  range: { from: string; to: string };
+  payments: { id: string; studentId: string; studentName: string; amountVnd: number; paidAt: string; note?: string | null }[];
+  totalVnd: number;
+}
+

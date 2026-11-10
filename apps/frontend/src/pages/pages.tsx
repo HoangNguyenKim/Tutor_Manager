@@ -1,57 +1,9 @@
-import { useEffect, useState } from 'react';
 import { vi } from '../i18n';
 import { Button } from '../components/Button';
 import { Card, CardTitle } from '../components/Card';
-import { EmptyState, Skeleton } from '../components/Feedback';
 import { Label } from '../components/Field';
 import { Page } from '../layout/Page';
 import { useToast } from '../toast';
-
-function useDemoLoading(delay = 600) {
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    const t = setTimeout(() => setLoading(false), delay);
-    return () => clearTimeout(t);
-  }, [delay]);
-  return loading;
-}
-
-export function DashboardPage() {
-  const loading = useDemoLoading();
-  return (
-    <Page title={vi.dashboard}>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {loading
-          ? [0, 1, 2, 3].map((i) => (
-              <Card key={i}>
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="mt-2 h-7 w-16" />
-              </Card>
-            ))
-          : [
-              { label: 'Học sinh', value: '0' },
-              { label: 'Buổi học tuần này', value: '0' },
-              { label: 'Giờ dạy tháng', value: '0h' },
-              { label: 'Học phí chờ thu', value: '0₫' },
-            ].map((s) => (
-              <Card key={s.label}>
-                <CardTitle>{s.label}</CardTitle>
-                <p className="mt-1 text-2xl font-bold">{s.value}</p>
-              </Card>
-            ))}
-      </div>
-      <EmptyState title={vi.empty} hint="Dữ liệu sẽ hiện khi có học sinh và buổi học." />
-    </Page>
-  );
-}
-
-export function ReportsPage() {
-  return (
-    <Page title={vi.reports}>
-      <EmptyState title={vi.empty} hint="Báo cáo theo học sinh, tháng, trạng thái thu phí." />
-    </Page>
-  );
-}
 
 export function SettingsPage() {
   const { push } = useToast();

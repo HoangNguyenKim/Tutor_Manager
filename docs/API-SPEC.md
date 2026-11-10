@@ -63,6 +63,14 @@ interface LessonDto { id: string; studentId: string; scheduledStart: string; sch
 interface PaymentDto { id: string; studentId: string; amountVnd: number; paidAt: string }
 ```
 
+## Reports — implemented
+
+- `GET /api/reports/overview?preset=week|month&from=&to=`: dashboard widgets — active students, scheduled/completed counts, planned/actual/bonus/billable minutes, tuition/collected/outstanding VND, upcoming lessons.
+- `GET /api/reports/monthly?year=&month=`: per-student tuition summary + totals.
+- `GET /api/reports/students/:id/history?from=&to=`: per-student lessons, payments, adjustments.
+- `GET /api/reports/bonus?from=&to=`: bonus hours summary per student.
+- `GET /api/reports/payments?from=&to=`: payment history + total.
+
 ## `GET /api/calendar/status` / `POST /api/calendar/sync` — planned, optional
 
 Only scheduled lesson info (`student name`, `start`, `minutes`) leaves the machine. Never tuition, payments, actual/bonus minutes.
