@@ -6,11 +6,13 @@
   "scripts": {
     "start": "tsc -p tsconfig.json && electron .",
     "build": "tsc -p tsconfig.json",
+    "postinstall": "electron-rebuild -f -w better-sqlite3 -m ../backend",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src --max-warnings 0",
     "smoke": "node smoke.cjs"
   },
   "devDependencies": {
+    "@electron/rebuild": "^3.7.2",
     "@types/node": "20.16.10",
     "electron": "31.4.0",
     "eslint": "9.12.0",
