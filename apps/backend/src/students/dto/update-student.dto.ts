@@ -1,8 +1,9 @@
-import { IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 
 export class UpdateStudentDto {
-  @IsOptional()
+  @ValidateIf((_object, value) => value !== undefined)
   @IsString()
+  @Matches(/\S/)
   @MaxLength(120)
   name?: string;
 
@@ -24,6 +25,7 @@ export class UpdateStudentDto {
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(Number.MAX_SAFE_INTEGER)
   hourlyRateVnd?: number;
 
   @IsOptional()

@@ -26,7 +26,12 @@ export function useStudent(id: string | undefined) {
 
 function useInvalidateStudents() {
   const qc = useQueryClient();
-  return () => qc.invalidateQueries({ queryKey: studentKeys.all });
+  return () => Promise.all([
+    qc.invalidateQueries({ queryKey: studentKeys.all }),
+    qc.invalidateQueries({ queryKey: ['lessons'] }),
+    qc.invalidateQueries({ queryKey: ['reports'] }),
+    qc.invalidateQueries({ queryKey: ['tuition'] }),
+  ]);
 }
 
 export function useCreateStudent() {

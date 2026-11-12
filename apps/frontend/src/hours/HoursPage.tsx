@@ -62,7 +62,10 @@ export function HoursPage() {
           <Skeleton className="h-10" /> <Skeleton className="h-10" /> <Skeleton className="h-10" />
         </div>
       ) : lessons.isError ? (
-        <p role="alert" className="text-sm text-red-600">Không tải được. Thử lại.</p>
+        <div className="flex flex-col items-start gap-3">
+          <p role="alert" className="text-sm text-red-600">Không tải được giờ dạy. Vui lòng kiểm tra kết nối rồi thử lại.</p>
+          <Button variant="secondary" onClick={() => lessons.refetch()}>{vi.retry}</Button>
+        </div>
       ) : items.length === 0 ? (
         <EmptyState title={vi.empty} />
       ) : (

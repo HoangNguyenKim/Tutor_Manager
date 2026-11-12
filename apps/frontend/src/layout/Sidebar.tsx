@@ -1,4 +1,5 @@
 import {
+  ArrowUpRight,
   BarChart3,
   BookOpen,
   CalendarDays,
@@ -10,7 +11,6 @@ import {
 } from 'lucide-react';
 import { routes, vi, type RouteKey } from '../i18n';
 import { cn } from '../lib/cn';
-
 const icons: Record<RouteKey, typeof LayoutDashboard> = {
   dashboard: LayoutDashboard,
   students: Users,
@@ -20,41 +20,67 @@ const icons: Record<RouteKey, typeof LayoutDashboard> = {
   reports: BarChart3,
   settings: SettingsIcon,
 };
-
-export function Sidebar({ route, onNavigate }: { route: RouteKey; onNavigate: (r: RouteKey) => void }) {
+export function Sidebar({
+  route,
+  onNavigate,
+}: {
+  route: RouteKey;
+  onNavigate: (route: RouteKey) => void;
+}) {
   return (
-    <nav aria-label="Điều hướng chính" className="flex h-full flex-col gap-1 p-3">
-      <div className="flex items-center gap-2 px-2 py-3">
-        <BookOpen className="size-5 text-sky-600" aria-hidden="true" />
-        <span className="truncate text-sm font-bold">{vi.appName}</span>
+    <nav
+      aria-label="Điều hướng chính"
+      className="tm-sidebar flex h-full flex-col gap-1 overflow-y-auto p-4"
+    >
+      <div className="mb-7 mt-3 flex items-center gap-3 px-2">
+        <span className="tm-brand-icon">
+          <BookOpen className="size-6" aria-hidden="true" />
+        </span>
+        <div>
+          <span className="text-sm font-bold tracking-tight">{vi.appName}</span>
+          <p className="tm-muted mt-1 text-xs">Không gian gia sư</p>
+        </div>
       </div>
-      <ul className="flex flex-col gap-1">
-        {routes.map((r) => {
-          const Icon = icons[r.key];
-          const active = r.key === route;
+      <p className="tm-eyebrow mb-3 px-3">QUẢN LÝ DẠY HỌC</p>
+      <ul className="flex flex-col gap-1.5">
+        {routes.map((routeItem) => {
+          const Icon = icons[routeItem.key];
+          const active = routeItem.key === route;
           return (
-            <li key={r.key}>
+            <li key={routeItem.key}>
               <a
-                href={r.hash}
+                href={routeItem.hash}
                 aria-current={active ? 'page' : undefined}
-                onClick={(e) => {
-                  e.preventDefault();
-                  onNavigate(r.key);
+                onClick={(event) => {
+                  event.preventDefault();
+                  onNavigate(routeItem.key);
                 }}
                 className={cn(
-                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
-                  active
-                    ? 'bg-sky-100 font-medium text-sky-900 dark:bg-sky-900 dark:text-sky-100'
-                    : 'hover:bg-slate-100 dark:hover:bg-slate-800',
+                  'tm-nav-link flex min-h-12 items-center gap-3 rounded-xl px-3 py-3 text-sm transition-colors',
+                  active && 'tm-nav-active',
                 )}
               >
-                <Icon className="size-4 shrink-0" aria-hidden="true" />
-                <span className="truncate">{vi[r.key]}</span>
+                <Icon className="size-[18px] shrink-0" aria-hidden="true" />
+                <span className="truncate">{vi[routeItem.key]}</span>
+                {active && <span aria-hidden="true" className="tm-nav-dot ml-auto" />}
               </a>
             </li>
           );
         })}
       </ul>
+      <div className="tm-sidebar-note mt-auto rounded-2xl border p-4">
+        <CalendarDays className="mb-3 size-5" aria-hidden="true" />
+        <p className="text-sm font-medium">Một lịch dạy ngăn nắp.</p>
+        <p className="tm-muted mt-2 text-xs leading-relaxed">
+          Dành nhiều thời gian hơn cho việc giảng dạy.
+        </p>
+        <a
+          href="#/calendar"
+          className="tm-text-link mt-4 inline-flex items-center gap-1 text-xs font-semibold"
+        >
+          Lịch của bạn <ArrowUpRight className="size-3.5" aria-hidden="true" />
+        </a>
+      </div>
     </nav>
   );
 }

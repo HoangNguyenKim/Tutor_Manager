@@ -29,24 +29,38 @@ export class TuitionRepository {
     });
   }
 
-  findPayment(id: string) {
-    return this.prisma.payment.findUnique({ where: { id }, include: { corrections: true } });
+  transaction<T>(work: (tx: Prisma.TransactionClient) => Promise<T>) {
+    return this.prisma.$transaction(work);
+  }
+
+  findPayment(id: string, tx: Prisma.TransactionClient = this.prisma) {
+    return tx.payment.findUnique({ where: { id }, include: { corrections: true } });
   }
 
   findByIdempotencyKey(key: string) {
     return this.prisma.payment.findUnique({ where: { idempotencyKey: key } });
   }
 
+  async originalPaymentAmount(id: string) {
+    // SQLite rowid breaks timestamp ties by insertion order, not random IDs.
+    // Corrections are append-only; their first previous amount is create identity.
+    const rows = await this.prisma.$queryRaw<{ previousAmountVnd: number }[]>`
+      SELECT previousAmountVnd FROM PaymentCorrection
+      WHERE paymentId = ${id} ORDER BY createdAt ASC, rowid ASC LIMIT 1
+    `;
+    return rows[0]?.previousAmountVnd;
+  }
+
   createPayment(data: Prisma.PaymentCreateInput) {
     return this.prisma.payment.create({ data });
   }
 
-  updatePaymentAmount(id: string, amountVnd: number) {
-    return this.prisma.payment.update({ where: { id }, data: { amountVnd } });
+  updatePaymentAmount(id: string, amountVnd: number, tx: Prisma.TransactionClient = this.prisma) {
+    return tx.payment.update({ where: { id }, data: { amountVnd } });
   }
 
-  createCorrection(data: Prisma.PaymentCorrectionCreateInput) {
-    return this.prisma.paymentCorrection.create({ data });
+  createCorrection(data: Prisma.PaymentCorrectionCreateInput, tx: Prisma.TransactionClient = this.prisma) {
+    return tx.paymentCorrection.create({ data });
   }
 
   createAdjustment(data: Prisma.TuitionAdjustmentCreateInput) {

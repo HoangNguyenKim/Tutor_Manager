@@ -50,14 +50,17 @@ export class LessonsService {
         details: { conflictingIds: conflicts.map((c) => c.id) },
       });
     }
+    const student = await this.repo.findStudent(dto.studentId);
+    if (!student) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Student not found' });
+    const hourlyRateVnd = dto.hourlyRateVnd ?? student.hourlyRateVnd ?? 0;
     return this.repo.create({
       student: { connect: { id: dto.studentId } },
       scheduledStart: start,
       scheduledMinutes: dto.scheduledMinutes,
       subject: dto.subject,
       billableMinutes: dto.scheduledMinutes,
-      hourlyRateVnd: dto.hourlyRateVnd ?? 0,
-      tuitionVnd: dto.hourlyRateVnd ?? 0,
+      hourlyRateVnd,
+      tuitionVnd: hourlyRateVnd,
       timeZone: tz,
     });
   }
@@ -68,6 +71,13 @@ export class LessonsService {
       throw new ConflictException({ code: 'BUSINESS_RULE', message: 'Only scheduled lessons can be rescheduled' });
     }
     const start = dto.scheduledStart ? new Date(dto.scheduledStart) : lesson.scheduledStart;
+    if (dto.timeZone !== undefined) {
+      try {
+        Intl.DateTimeFormat(undefined, { timeZone: dto.timeZone });
+      } catch {
+        throw new BadRequestException({ code: 'VALIDATION', message: `Unknown timeZone: ${dto.timeZone}` });
+      }
+    }
     const minutes = dto.scheduledMinutes ?? lesson.scheduledMinutes;
     const end = lessonEnd(start, minutes);
     const existing = await this.repo.findActiveInRange(lesson.studentId, start, end, id);
@@ -154,10 +164,21 @@ export class LessonsService {
 
   async createRecurrence(dto: CreateRecurrenceDto) {
     const tz = dto.timeZone?.trim() || DEFAULT_TZ;
+    try {
+      Intl.DateTimeFormat(undefined, { timeZone: tz });
+    } catch {
+      throw new BadRequestException({ code: 'VALIDATION', message: `Unknown timeZone: ${tz}` });
+    }
     const from = new Date(dto.validFrom);
     const until = dto.validUntil ? new Date(dto.validUntil) : new Date(from.getTime() + 90 * 86400000);
+    if (until < from) {
+      throw new BadRequestException({ code: 'VALIDATION', message: 'validUntil must not precede validFrom' });
+    }
     const [hour, minute] = dto.startTime.split(':').map(Number) as [number, number];
     const occurrences = expandWeekly(from, until, { weekday: dto.weekday, hour, minute, scheduledMinutes: dto.scheduledMinutes });
+    const student = await this.repo.findStudent(dto.studentId);
+    if (!student) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Student not found' });
+    const hourlyRateVnd = dto.hourlyRateVnd ?? student.hourlyRateVnd ?? 0;
     const rule = await this.repo.createRecurrence({
       student: { connect: { id: dto.studentId } },
       weekday: dto.weekday,
@@ -166,7 +187,7 @@ export class LessonsService {
       timeZone: tz,
       validFrom: from,
       validUntil: dto.validUntil ? new Date(dto.validUntil) : null,
-      hourlyRateVnd: dto.hourlyRateVnd ?? 0,
+      hourlyRateVnd,
     });
     let created = 0;
     const skipped: string[] = [];
@@ -189,8 +210,8 @@ export class LessonsService {
         scheduledMinutes: dto.scheduledMinutes,
         subject: dto.subject,
         billableMinutes: dto.scheduledMinutes,
-        hourlyRateVnd: dto.hourlyRateVnd ?? 0,
-        tuitionVnd: dto.hourlyRateVnd ?? 0,
+        hourlyRateVnd,
+        tuitionVnd: hourlyRateVnd,
         timeZone: tz,
         recurrence: { connect: { id: rule.id } },
       });

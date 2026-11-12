@@ -1,37 +1,46 @@
+import { CalendarDays, Moon, Sun } from 'lucide-react';
 import { vi } from '../i18n';
 import { Button } from '../components/Button';
 import { Card, CardTitle } from '../components/Card';
-import { Label } from '../components/Field';
 import { Page } from '../layout/Page';
-import { useToast } from '../toast';
-
+import { useTheme } from '../theme';
 export function SettingsPage() {
-  const { push } = useToast();
+  const { theme, toggle } = useTheme();
   return (
     <Page title={vi.settings}>
       <Card>
-        <CardTitle>Đồng bộ Google Calendar (tùy chọn)</CardTitle>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Chỉ đồng bộ thông tin lịch dự kiến. Không gửi học phí, thanh toán, giờ thực dạy.
-        </p>
-        <form
-          className="mt-3 flex max-w-sm flex-col gap-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            push('Đã lưu cài đặt (bản demo).');
-          }}
-        >
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <Label htmlFor="sync">Chế độ đồng bộ</Label>
-            <select id="sync" className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900">
-              <option value="off">Tắt</option>
-              <option value="push">Chỉ đẩy lịch dự kiến</option>
-            </select>
+            <CardTitle>Giao diện</CardTitle>
+            <p className="tm-muted mt-2 text-sm">
+              Chọn không gian sáng hoặc tối. Lựa chọn được lưu trên thiết bị này khi trình duyệt cho
+              phép.
+            </p>
           </div>
+          <Button variant="secondary" onClick={toggle} aria-pressed={theme === 'dark'}>
+            {theme === 'dark' ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}
+            {theme === 'dark' ? 'Chuyển sang sáng' : 'Chuyển sang tối'}
+          </Button>
+        </div>
+      </Card>
+      <Card>
+        <div className="flex items-start gap-4">
+          <span className="tm-icon-tile">
+            <CalendarDays className="size-5" aria-hidden="true" />
+          </span>
           <div>
-            <Button type="submit">{vi.save}</Button>
+            <CardTitle>Đồng bộ Google Calendar</CardTitle>
+            <p className="tm-count mt-3">Chưa được kết nối</p>
+            <p className="tm-muted mt-3 max-w-2xl text-sm leading-relaxed">
+              Tính năng đồng bộ chưa được triển khai trong phiên bản này. Lịch dạy vẫn được quản lý
+              trong ứng dụng; chưa có dữ liệu nào được gửi đến Google Calendar.
+            </p>
+            <p className="tm-muted mt-2 max-w-2xl text-sm leading-relaxed">
+              Khi được hỗ trợ, chỉ thông tin lịch dự kiến được đồng bộ, không bao gồm học phí, thanh
+              toán hoặc giờ thực dạy.
+            </p>
           </div>
-        </form>
+        </div>
       </Card>
     </Page>
   );

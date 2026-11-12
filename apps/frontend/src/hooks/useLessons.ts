@@ -52,7 +52,12 @@ export function useLessons(params: LessonListParams) {
 
 function useInvalidateLessons() {
   const qc = useQueryClient();
-  return () => qc.invalidateQueries({ queryKey: lessonKeys.all });
+  return () => Promise.all([
+    qc.invalidateQueries({ queryKey: lessonKeys.all }),
+    qc.invalidateQueries({ queryKey: ['tuition'] }),
+    qc.invalidateQueries({ queryKey: ['reports'] }),
+    qc.invalidateQueries({ queryKey: ['students'] }),
+  ]);
 }
 
 export function useCreateLesson() {

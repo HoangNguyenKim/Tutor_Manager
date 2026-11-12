@@ -8,7 +8,7 @@ export class CreateLessonDto {
   studentId!: string;
 
   /** ISO-8601 instant (UTC). Wall-clock + zone are resolved client-side before submit. */
-  @IsDateString()
+  @IsDateString({ strict: true })
   scheduledStart!: string;
 
   @IsInt()
@@ -27,12 +27,13 @@ export class CreateLessonDto {
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(Number.MAX_SAFE_INTEGER)
   hourlyRateVnd?: number;
 }
 
 export class UpdateLessonDto {
   @IsOptional()
-  @IsDateString()
+  @IsDateString({ strict: true })
   scheduledStart?: string;
 
   @IsOptional()
@@ -53,11 +54,11 @@ export class UpdateLessonDto {
 
 export class ListLessonsQuery {
   @IsOptional()
-  @IsDateString()
+  @IsDateString({ strict: true })
   from?: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsDateString({ strict: true })
   to?: string;
 
   @IsOptional()
@@ -113,7 +114,7 @@ export class CreateRecurrenceDto {
   weekday!: number;
 
   /** HH:mm wall-clock in timeZone */
-  @Matches(/^\d{2}:\d{2}$/)
+  @Matches(/^(?:[01]\d|2[0-3]):[0-5]\d$/)
   startTime!: string;
 
   @IsInt()
@@ -129,15 +130,16 @@ export class CreateRecurrenceDto {
   @MaxLength(120)
   timeZone?: string;
 
-  @IsDateString()
+  @IsDateString({ strict: true })
   validFrom!: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsDateString({ strict: true })
   validUntil?: string;
 
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(Number.MAX_SAFE_INTEGER)
   hourlyRateVnd?: number;
 }

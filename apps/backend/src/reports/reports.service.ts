@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ReportsRepository } from './reports.repository';
+import { validateReportMonth, validateReportRange } from './report-validation';
 
 export interface RangeInput {
   from?: Date;
@@ -31,9 +32,10 @@ function endOfMonth(d = new Date()): Date {
 }
 
 export function resolveRange(preset?: string, from?: string, to?: string): { from: Date; to: Date } {
+  const explicit = validateReportRange(from, to);
   if (preset === 'week') return { from: startOfWeek(), to: endOfWeek() };
-  if (preset === 'month' || !from || !to) return { from: startOfMonth(), to: endOfMonth() };
-  return { from: new Date(from), to: new Date(to) };
+  if (preset === 'month' || !explicit) return { from: startOfMonth(), to: endOfMonth() };
+  return explicit;
 }
 
 /** Aggregates real SQLite rows — no mock data, integer VND throughout. */
@@ -84,15 +86,17 @@ export class ReportsService {
   }
 
   async studentHistory(studentId: string, from?: string, to?: string) {
+    const range = validateReportRange(from, to);
     const [lessons, payments, adjustments] = await Promise.all([
-      this.repo.studentHistory(studentId, from ? new Date(from) : undefined, to ? new Date(to) : undefined),
-      this.repo.studentPayments(studentId, from ? new Date(from) : undefined, to ? new Date(to) : undefined),
-      this.repo.studentAdjustments(studentId, from ? new Date(from) : undefined, to ? new Date(to) : undefined),
+      this.repo.studentHistory(studentId, range?.from, range?.to),
+      this.repo.studentPayments(studentId, range?.from, range?.to),
+      this.repo.studentAdjustments(studentId, range?.from, range?.to),
     ]);
     return { lessons, payments, adjustments };
   }
 
-  async monthlySummary(year: number, month: number) {
+  async monthlySummary(yearInput: number | string, monthInput: number | string) {
+    const { year, month } = validateReportMonth(yearInput, monthInput);
     const from = new Date(year, month - 1, 1);
     const to = new Date(year, month, 0, 23, 59, 59, 999);
     const [lessons, payments, adjustments] = await Promise.all([
@@ -108,6 +112,11 @@ export class ReportsService {
       e.minutes += l.billableMinutes;
       e.tuitionVnd += l.tuitionVnd;
       byStudent.set(l.studentId, e);
+    }
+    for (const a of adjustments) {
+      const e = byStudent.get(a.studentId) ?? { studentId: a.studentId, studentName: a.student.name, lessons: 0, minutes: 0, tuitionVnd: 0, paidVnd: 0 };
+      e.tuitionVnd += a.amountVnd;
+      byStudent.set(a.studentId, e);
     }
     for (const p of payments) {
       const e = byStudent.get(p.studentId) ?? { studentId: p.studentId, studentName: p.student.name, lessons: 0, minutes: 0, tuitionVnd: 0, paidVnd: 0 };
@@ -127,7 +136,7 @@ export class ReportsService {
   }
 
   async bonusSummary(from?: string, to?: string) {
-    const range = from && to ? { from: new Date(from), to: new Date(to) } : resolveRange('month');
+    const range = resolveRange(undefined, from, to);
     const lessons = await this.repo.lessonsInRange(range.from, range.to);
     const completed = lessons.filter((l) => l.status === 'completed' && l.bonusMinutes > 0);
     const byStudent = new Map<string, { studentId: string; studentName: string; bonusMinutes: number; billableBonusMinutes: number }>();
@@ -141,7 +150,7 @@ export class ReportsService {
   }
 
   async paymentHistory(from?: string, to?: string) {
-    const range = from && to ? { from: new Date(from), to: new Date(to) } : resolveRange('month');
+    const range = resolveRange(undefined, from, to);
     const payments = await this.repo.paymentsInRange(range.from, range.to);
     return {
       range,

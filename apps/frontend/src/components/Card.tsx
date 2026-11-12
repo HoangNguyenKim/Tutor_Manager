@@ -1,10 +1,10 @@
 import type { HTMLAttributes } from 'react';
 import { cn } from '../lib/cn';
-
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900', className)} {...props} />;
+  return (
+    <div className={cn('tm-card min-w-0 rounded-2xl border p-5 sm:p-6', className)} {...props} />
+  );
 }
-
 export function CardTitle({ className, ...props }: HTMLAttributes<HTMLHeadingElement>) {
-  return <h3 className={cn('text-sm font-semibold', className)} {...props} />;
+  return <h3 className={cn('text-sm font-semibold leading-relaxed', className)} {...props} />;
 }

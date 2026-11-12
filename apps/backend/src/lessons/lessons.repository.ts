@@ -51,6 +51,10 @@ export class LessonsRepository {
     });
   }
 
+  findStudent(id: string) {
+    return this.prisma.student.findUnique({ where: { id } });
+  }
+
   create(data: Prisma.LessonCreateInput) {
     return this.prisma.lesson.create({ data });
   }

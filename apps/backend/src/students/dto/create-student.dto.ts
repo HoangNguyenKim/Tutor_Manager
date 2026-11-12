@@ -1,8 +1,9 @@
-import { IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsInt, IsNotEmpty, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 
 export class CreateStudentDto {
   @IsString()
   @IsNotEmpty()
+  @Matches(/\S/)
   @MaxLength(120)
   name!: string;
 
@@ -24,6 +25,7 @@ export class CreateStudentDto {
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(Number.MAX_SAFE_INTEGER)
   hourlyRateVnd?: number;
 
   @IsOptional()

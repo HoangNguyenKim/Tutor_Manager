@@ -4,6 +4,7 @@ import { ApiError } from '../api/client';
 import { Button } from '../components/Button';
 import { Input, Label, Textarea } from '../components/Field';
 import { vi } from '../i18n';
+import { createSubmissionGate, validateStudent } from '../hooks/formValidation';
 
 export interface StudentFormValues {
   name: string;
@@ -50,6 +51,7 @@ export function StudentForm({
   onSubmit: (dto: CreateStudentDto) => Promise<unknown>;
   onCancel: () => void;
 }) {
+  const [submission] = useState(createSubmissionGate);
   const [values, setValues] = useState<StudentFormValues>(() => toFormValues(initial));
   const [error, setError] = useState<string | null>(null);
   const set = (k: keyof StudentFormValues) => (e: { target: { value: string } }) =>
@@ -57,28 +59,22 @@ export function StudentForm({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    setError(null);
-    if (!values.name.trim()) {
-      setError('Tên học sinh là bắt buộc.');
-      return;
-    }
-    if (values.hourlyRateVnd.trim() !== '') {
-      const n = Number(values.hourlyRateVnd);
-      if (!Number.isInteger(n) || n < 0) {
-        setError('Học phí giờ phải là số nguyên VND >= 0.');
-        return;
+    if (pending || submission.pending) return;
+    const validationError = validateStudent(values);
+    setError(validationError);
+    if (validationError) return;
+    await submission.run(async () => {
+      try {
+        await onSubmit(toDto(values));
+      } catch (err) {
+        if (err instanceof ApiError) setError(err.message);
+        else setError('Không lưu được hồ sơ. Vui lòng kiểm tra kết nối rồi thử lại.');
       }
-    }
-    try {
-      await onSubmit(toDto(values));
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.message);
-      else setError('Không lưu được. Thử lại.');
-    }
+    });
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+    <form noValidate aria-busy={pending} onSubmit={handleSubmit} className="flex flex-col gap-3">
       {error ? (
         <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
           {error}
@@ -86,7 +82,7 @@ export function StudentForm({
       ) : null}
       <div>
         <Label htmlFor="stu-name">Tên học sinh *</Label>
-        <Input id="stu-name" value={values.name} onChange={set('name')} maxLength={120} placeholder="Nguyễn Văn A" />
+        <Input required autoComplete="name" id="stu-name" value={values.name} onChange={set('name')} maxLength={120} placeholder="Nguyễn Văn A" />
       </div>
       <div>
         <Label htmlFor="stu-grade">Khối lớp</Label>
@@ -95,7 +91,7 @@ export function StudentForm({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <Label htmlFor="stu-phone">Điện thoại</Label>
-          <Input id="stu-phone" value={values.phone} onChange={set('phone')} maxLength={30} />
+          <Input type="tel" autoComplete="tel" id="stu-phone" value={values.phone} onChange={set('phone')} maxLength={30} />
         </div>
         <div>
           <Label htmlFor="stu-parent">Liên hệ phụ huynh</Label>
@@ -111,7 +107,7 @@ export function StudentForm({
         <Textarea id="stu-notes" value={values.notes} onChange={set('notes')} maxLength={2000} />
       </div>
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="secondary" onClick={onCancel}>
+        <Button type="button" variant="secondary" onClick={onCancel} disabled={pending}>
           {vi.cancel}
         </Button>
         <Button type="submit" disabled={pending}>

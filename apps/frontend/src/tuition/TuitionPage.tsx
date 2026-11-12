@@ -9,6 +9,7 @@ import { EmptyState, Skeleton } from '../components/Feedback';
 import { Input, Label, Select, Textarea } from '../components/Field';
 import { useCorrectPayment, useCreateAdjustment, useCreatePayment, usePayments, useStatement } from '../hooks/useTuition';
 import { useStudents } from '../hooks/useStudents';
+import { createPaymentAttempt, createSubmissionGate, integerInput, parseDateInput, validatePayment, validateReason } from '../hooks/formValidation';
 import { vi } from '../i18n';
 import { Page } from '../layout/Page';
 import { useToast } from '../toast';
@@ -24,35 +25,37 @@ function PaymentDialog({ studentId, onClose }: { studentId: string; onClose: () 
   const create = useCreatePayment();
   const [amount, setAmount] = useState('');
   const [paidAt, setPaidAt] = useState(todayInput());
+  const [attempt] = useState(() => createPaymentAttempt(() => typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`));
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [submission] = useState(createSubmissionGate);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    setError(null);
-    const n = Number(amount);
-    if (!Number.isInteger(n) || n < 1) {
-      setError('Số tiền phải là số nguyên VND >= 1.');
-      return;
-    }
-    try {
-      const res = await create.mutateAsync({
-        studentId,
-        amountVnd: n,
-        paidAt: new Date(paidAt).toISOString(),
-        ...(note.trim() ? { note: note.trim() } : {}),
-        idempotencyKey: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${n}`,
-      });
-      push(res.duplicate ? 'Đã ghi nhận thanh toán trước đó.' : 'Đã ghi nhận thanh toán.');
-      onClose();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không lưu được. Thử lại.');
-    }
+    if (create.isPending || submission.pending) return;
+    const validationError = validatePayment(amount, paidAt, note, todayInput());
+    setError(validationError);
+    if (validationError) return;
+    const dto = {
+      studentId,
+      amountVnd: Number(amount.trim()),
+      paidAt: parseDateInput(paidAt)!.toISOString(),
+      ...(note.trim() ? { note: note.trim() } : {}),
+    };
+    await submission.run(async () => {
+      try {
+        const res = await create.mutateAsync({ ...dto, idempotencyKey: attempt.keyFor(dto) });
+        push(res.duplicate ? 'Đã ghi nhận thanh toán trước đó.' : 'Đã ghi nhận thanh toán.');
+        onClose();
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : 'Chưa xác nhận được thanh toán. Kiểm tra kết nối rồi bấm Lưu lại; hệ thống sẽ tránh ghi trùng.');
+      }
+    });
   }
 
   return (
-    <Dialog open onClose={onClose} title="Ghi nhận thanh toán">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+    <Dialog open onClose={() => { if (!submission.pending) onClose(); }} title="Ghi nhận thanh toán">
+      <form noValidate aria-busy={create.isPending} onSubmit={handleSubmit} className="flex flex-col gap-3">
         {error ? (
           <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
             {error}
@@ -61,11 +64,11 @@ function PaymentDialog({ studentId, onClose }: { studentId: string; onClose: () 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <Label htmlFor="pay-amount">Số tiền (VND) *</Label>
-            <Input id="pay-amount" inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="300000" />
+            <Input required id="pay-amount" inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="300000" />
           </div>
           <div>
             <Label htmlFor="pay-date">Ngày thu *</Label>
-            <Input id="pay-date" type="date" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} />
+            <Input required max={todayInput()} id="pay-date" type="date" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} />
           </div>
         </div>
         <div>
@@ -73,7 +76,7 @@ function PaymentDialog({ studentId, onClose }: { studentId: string; onClose: () 
           <Textarea id="pay-note" value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} />
         </div>
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button type="button" variant="secondary" disabled={create.isPending} onClick={onClose}>
             {vi.cancel}
           </Button>
           <Button type="submit" disabled={create.isPending}>
@@ -91,31 +94,38 @@ function CorrectDialog({ paymentId, current, onClose }: { paymentId: string; cur
   const [amount, setAmount] = useState(String(current));
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [submission] = useState(createSubmissionGate);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (correct.isPending || submission.pending) return;
     setError(null);
-    const n = Number(amount);
-    if (!Number.isInteger(n) || n < 1) {
-      setError('Số tiền phải là số nguyên VND >= 1.');
+    const n = integerInput(amount, 1);
+    if (n === null) {
+      setError('Số tiền mới phải là số nguyên VND từ 1, không dùng dấu phân cách.');
       return;
     }
-    if (!reason.trim()) {
-      setError('Lý do điều chỉnh là bắt buộc (lưu vết kiểm toán).');
+    if (n === current) {
+      setError('Số tiền mới phải khác số tiền hiện tại. Chưa có thay đổi để lưu.');
       return;
     }
-    try {
-      await correct.mutateAsync({ id: paymentId, dto: { newAmountVnd: n, reason: reason.trim() } });
-      push('Đã sửa thanh toán (có lưu vết).');
-      onClose();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không lưu được. Thử lại.');
-    }
+    const reasonError = validateReason(reason);
+    if (reasonError) { setError(reasonError); return; }
+    if (!window.confirm(`Xác nhận sửa thanh toán từ ${formatVnd(current)} thành ${formatVnd(n)}? Thay đổi sẽ được lưu vết.`)) return;
+    await submission.run(async () => {
+      try {
+        await correct.mutateAsync({ id: paymentId, dto: { newAmountVnd: n, reason: reason.trim() } });
+        push('Đã sửa thanh toán (có lưu vết).');
+        onClose();
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : 'Không lưu được điều chỉnh. Vui lòng thử lại.');
+      }
+    });
   }
 
   return (
-    <Dialog open onClose={onClose} title="Sửa thanh toán">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+    <Dialog open onClose={() => { if (!submission.pending) onClose(); }} title="Sửa thanh toán">
+      <form noValidate aria-busy={correct.isPending} onSubmit={handleSubmit} className="flex flex-col gap-3">
         {error ? (
           <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
             {error}
@@ -124,14 +134,14 @@ function CorrectDialog({ paymentId, current, onClose }: { paymentId: string; cur
         <p className="text-sm">Hiện tại: <strong>{formatVnd(current)}</strong></p>
         <div>
           <Label htmlFor="corr-amount">Số tiền mới (VND) *</Label>
-          <Input id="corr-amount" inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          <Input required id="corr-amount" inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} />
         </div>
         <div>
           <Label htmlFor="corr-reason">Lý do *</Label>
-          <Textarea id="corr-reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} placeholder="Ghi thiếu tiền mặt…" />
+          <Textarea required id="corr-reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} placeholder="Ghi thiếu tiền mặt…" />
         </div>
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button type="button" variant="secondary" disabled={correct.isPending} onClick={onClose}>
             {vi.cancel}
           </Button>
           <Button type="submit" disabled={correct.isPending}>
@@ -149,31 +159,34 @@ function AdjustmentDialog({ studentId, onClose }: { studentId: string; onClose: 
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [submission] = useState(createSubmissionGate);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (create.isPending || submission.pending) return;
     setError(null);
-    const n = Number(amount);
-    if (!Number.isInteger(n) || n === 0) {
-      setError('Số tiền điều chỉnh phải là số nguyên khác 0 (âm = giảm).');
+    const n = integerInput(amount, -Number.MAX_SAFE_INTEGER);
+    if (n === null || n === 0) {
+      setError('Số tiền điều chỉnh phải là số nguyên khác 0, không dùng dấu phân cách (âm = giảm).');
       return;
     }
-    if (!reason.trim()) {
-      setError('Lý do là bắt buộc.');
-      return;
-    }
-    try {
-      await create.mutateAsync({ studentId, amountVnd: n, reason: reason.trim() });
-      push('Đã thêm điều chỉnh học phí.');
-      onClose();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không lưu được. Thử lại.');
-    }
+    const reasonError = validateReason(reason);
+    if (reasonError) { setError(reasonError); return; }
+    if (!window.confirm(`Xác nhận ${n < 0 ? 'giảm' : 'tăng'} học phí ${formatVnd(Math.abs(n))}? Điều chỉnh sẽ được lưu vết.`)) return;
+    await submission.run(async () => {
+      try {
+        await create.mutateAsync({ studentId, amountVnd: n, reason: reason.trim() });
+        push('Đã thêm điều chỉnh học phí.');
+        onClose();
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : 'Không lưu được điều chỉnh. Vui lòng thử lại.');
+      }
+    });
   }
 
   return (
-    <Dialog open onClose={onClose} title="Điều chỉnh học phí">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+    <Dialog open onClose={() => { if (!submission.pending) onClose(); }} title="Điều chỉnh học phí">
+      <form noValidate aria-busy={create.isPending} onSubmit={handleSubmit} className="flex flex-col gap-3">
         {error ? (
           <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
             {error}
@@ -181,14 +194,14 @@ function AdjustmentDialog({ studentId, onClose }: { studentId: string; onClose: 
         ) : null}
         <div>
           <Label htmlFor="adj-amount">Số tiền (VND) *</Label>
-          <Input id="adj-amount" inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="-50000" />
+          <Input required id="adj-amount" inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="-50000" />
         </div>
         <div>
           <Label htmlFor="adj-reason">Lý do *</Label>
-          <Textarea id="adj-reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} />
+          <Textarea required id="adj-reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} />
         </div>
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button type="button" variant="secondary" disabled={create.isPending} onClick={onClose}>
             {vi.cancel}
           </Button>
           <Button type="submit" disabled={create.isPending}>
@@ -230,7 +243,7 @@ export function TuitionPage() {
       }
     >
       <div className="flex flex-wrap gap-2">
-        <Select aria-label="Học sinh" value={studentId} onChange={(e) => setStudentId(e.target.value)} className="w-48">
+        <Select aria-label="Học sinh" value={studentId} disabled={payOpen || adjOpen || correcting !== null} onChange={(e) => setStudentId(e.target.value)} className="w-48">
           <option value="">— Chọn học sinh —</option>
           {(students.data?.items ?? []).map((s) => (
             <option key={s.id} value={s.id}>
@@ -330,15 +343,16 @@ export function TuitionPage() {
                   </Button>
                 </div>
               ))}
-              {(payments.data ?? []).length === 0 ? <p className="text-sm text-slate-500">Chưa có thanh toán.</p> : null}
+              {payments.isLoading ? <p role="status" className="text-sm">Đang tải thanh toán…</p> : payments.isError ? <div><p role="alert" className="text-sm text-red-600">Không tải được lịch sử thanh toán.</p><Button variant="secondary" onClick={() => payments.refetch()}>{vi.retry}</Button></div> : null}
+              {!payments.isLoading && !payments.isError && (payments.data ?? []).length === 0 ? <p className="text-sm text-slate-500">Chưa có thanh toán.</p> : null}
             </div>
           </Card>
         </>
       )}
 
-      {payOpen && studentId ? <PaymentDialog studentId={studentId} onClose={() => setPayOpen(false)} /> : null}
-      {adjOpen && studentId ? <AdjustmentDialog studentId={studentId} onClose={() => setAdjOpen(false)} /> : null}
-      {correcting ? <CorrectDialog paymentId={correcting.id} current={correcting.amount} onClose={() => setCorrecting(null)} /> : null}
+      {payOpen && studentId ? <PaymentDialog key={studentId} studentId={studentId} onClose={() => setPayOpen(false)} /> : null}
+      {adjOpen && studentId ? <AdjustmentDialog key={studentId} studentId={studentId} onClose={() => setAdjOpen(false)} /> : null}
+      {correcting ? <CorrectDialog key={correcting.id} paymentId={correcting.id} current={correcting.amount} onClose={() => setCorrecting(null)} /> : null}
     </Page>
   );
 }

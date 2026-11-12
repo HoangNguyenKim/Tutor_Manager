@@ -12,6 +12,7 @@ import { vi } from '../i18n';
 import { Page } from '../layout/Page';
 import { useToast } from '../toast';
 import { StudentForm } from './StudentForm';
+import { createSubmissionGate } from '../hooks/formValidation';
 
 type SortKey = 'name' | 'rate';
 
@@ -22,11 +23,12 @@ function sortItems(items: StudentDto[], key: SortKey): StudentDto[] {
   return copy;
 }
 
-function ConfirmDialog({ open, title, body, confirmLabel, onConfirm, onClose, pending }: { open: boolean; title: string; body: string; confirmLabel: string; onConfirm: () => void; onClose: () => void; pending: boolean }) {
+function ConfirmDialog({ open, title, body, confirmLabel, onConfirm, onClose, pending, error }: { open: boolean; title: string; body: string; confirmLabel: string; onConfirm: () => void; onClose: () => void; pending: boolean; error: string | null }) {
   if (!open) return null;
   return (
     <Dialog open={open} onClose={onClose} title={title}>
       <p className="text-sm">{body}</p>
+      {error ? <p role="alert" className="mt-3 text-sm text-red-600">{error}</p> : null}
       <div className="mt-4 flex justify-end gap-2">
         <Button variant="secondary" onClick={onClose}>
           {vi.cancel}
@@ -78,6 +80,9 @@ function StudentDetail({ id, onClose, onEdit }: { id: string; onClose: () => voi
 
 export function StudentsPage() {
   const { push } = useToast();
+  const [archiveSubmission] = useState(createSubmissionGate);
+  const [restoreSubmission] = useState(createSubmissionGate);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
 
@@ -106,6 +111,29 @@ export function StudentsPage() {
 
   const items = list.data ? sortItems(list.data.items, sort) : [];
 
+  async function archiveStudent() {
+    if (!archiveId || archive.isPending) return;
+    setActionError(null);
+    await archiveSubmission.run(async () => {
+      try {
+        await archive.mutateAsync(archiveId);
+        setArchiveId(null);
+        push('Đã lưu trữ học sinh.');
+      } catch { setActionError('Không lưu trữ được học sinh. Vui lòng kiểm tra kết nối rồi thử lại.'); }
+    });
+  }
+
+  async function restoreStudent(student: StudentDto) {
+    if (restore.isPending) return;
+    setActionError(null);
+    await restoreSubmission.run(async () => {
+      try {
+        await restore.mutateAsync(student.id);
+        push(`Đã khôi phục ${student.name}.`);
+      } catch { setActionError('Không khôi phục được học sinh. Vui lòng thử lại.'); }
+    });
+  }
+
   return (
     <Page
       title={vi.students}
@@ -115,6 +143,7 @@ export function StudentsPage() {
         </Button>
       }
     >
+      {actionError && archiveId === null ? <p role="alert" className="text-sm text-red-600">{actionError}</p> : null}
       <div className="flex flex-wrap gap-2">
         <div className="min-w-40 flex-1">
           <Label htmlFor="stu-search" className="sr-only">{vi.search}</Label>
@@ -185,7 +214,8 @@ export function StudentsPage() {
                           size="icon"
                           title="Khôi phục"
                           aria-label={`Khôi phục ${s.name}`}
-                          onClick={() => restore.mutate(s.id, { onSuccess: () => push(`Đã khôi phục ${s.name}.`) })}
+                          disabled={restore.isPending}
+                          onClick={() => restoreStudent(s)}
                         >
                           <RotateCcw aria-hidden="true" />
                         </Button>
@@ -200,7 +230,7 @@ export function StudentsPage() {
       )}
       {list.data ? <p className="text-xs text-slate-500">Tổng {list.data.total} học sinh.</p> : null}
 
-      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} title={`${vi.add} — ${vi.students}`}>
+      <Dialog open={createOpen} onClose={() => { if (!create.isPending) setCreateOpen(false); }} title={`${vi.add} — ${vi.students}`}>
         <StudentForm
           pending={create.isPending}
           submitLabel={vi.save}
@@ -213,11 +243,12 @@ export function StudentsPage() {
         />
       </Dialog>
 
-      <Dialog open={editId !== null} onClose={() => setEditId(null)} title={`Sửa — ${vi.students}`}>
+      <Dialog open={editId !== null} onClose={() => { if (!update.isPending) setEditId(null); }} title={`Sửa — ${vi.students}`}>
         {editing.isLoading ? (
           <div className="flex flex-col gap-2"><Skeleton /> <Skeleton /></div>
         ) : editing.data ? (
           <StudentForm
+            key={editing.data.student.id}
             initial={editing.data.student}
             pending={update.isPending}
             submitLabel={vi.save}
@@ -243,16 +274,9 @@ export function StudentsPage() {
         body="Hồ sơ được giữ lại cùng toàn bộ lịch sử buổi học và thanh toán. Có thể khôi phục sau."
         confirmLabel="Lưu trữ"
         pending={archive.isPending}
-        onClose={() => setArchiveId(null)}
-        onConfirm={() => {
-          if (!archiveId) return;
-          archive.mutate(archiveId, {
-            onSuccess: () => {
-              setArchiveId(null);
-              push('Đã lưu trữ học sinh.');
-            },
-          });
-        }}
+        error={actionError}
+        onClose={() => { if (!archiveSubmission.pending) setArchiveId(null); }}
+        onConfirm={archiveStudent}
       />
     </Page>
   );

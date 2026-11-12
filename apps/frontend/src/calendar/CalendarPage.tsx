@@ -18,6 +18,8 @@ import { CompleteLessonDialog } from './CompleteLessonDialog';
 import { vi } from '../i18n';
 import { Page } from '../layout/Page';
 import { useToast } from '../toast';
+import { createSubmissionGate, integerInput, lessonDefaults, parseLocalDateTime } from '../hooks/formValidation';
+type LessonDraft = { start: Date; studentId?: string; lesson?: LessonItem };
 
 const DEFAULT_TZ = 'Asia/Ho_Chi_Minh';
 
@@ -28,51 +30,75 @@ function toLocalInput(iso: string): string {
 }
 
 function eventColor(status: LessonItem['status']): string {
-  if (status === 'cancelled') return '#94a3b8';
-  if (status === 'completed') return '#16a34a';
-  return '#0284c7';
+  if (status === 'cancelled') return '#776579';
+  if (status === 'completed') return '#92604f';
+  return '#78619c';
 }
 
 function LessonDialog({
   initial,
   onClose,
+  onComplete,
 }: {
-  initial: { id?: string; start: Date; studentId?: string } | null;
+  initial: LessonDraft;
   onClose: () => void;
+  onComplete: (lesson: LessonItem) => void;
 }) {
   const { push } = useToast();
   const create = useCreateLesson();
   const update = useUpdateLesson();
   const students = useStudents({ status: 'active', pageSize: 100 });
-  const [studentId, setStudentId] = useState(initial?.studentId ?? '');
-  const [subject, setSubject] = useState<Subject>('Toán');
-  const [start, setStart] = useState(initial ? toLocalInput(initial.start.toISOString()) : '');
-  const [minutes, setMinutes] = useState('60');
+  const cancel = useCancelLesson();
+  const [submission] = useState(createSubmissionGate);
+  const lesson = initial.lesson;
+  const defaults = lessonDefaults(lesson ?? initial);
+  const [studentId, setStudentId] = useState(defaults.studentId);
+  const [subject, setSubject] = useState<Subject>(defaults.subject as Subject);
+  const [start, setStart] = useState(toLocalInput(initial.start.toISOString()));
+  const [minutes, setMinutes] = useState(defaults.minutes);
   const [error, setError] = useState<string | null>(null);
-  const pending = create.isPending || update.isPending;
-  if (!initial) return null;
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const pending = create.isPending || update.isPending || cancel.isPending;
+  const readOnly = !!lesson && lesson.status !== 'scheduled';
+  const locked = pending || confirmCancel || readOnly;
+  const close = () => { if (!pending && !submission.pending) onClose(); };
+
+  async function handleCancel() {
+    if (!lesson || lesson.status !== 'scheduled' || pending || submission.pending) return;
+    setError(null);
+    await submission.run(async () => {
+      try {
+        await cancel.mutateAsync(lesson.id);
+        push('Đã hủy buổi học (giữ lại lịch sử).');
+        onClose();
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : 'Không hủy được. Thử lại.');
+      }
+    });
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!initial) return;
+    if (pending || submission.pending || confirmCancel || (lesson && lesson.status !== 'scheduled')) return;
     setError(null);
-    if (!studentId) {
+    if (!studentId || (!lesson && (students.isPending || students.isError))) {
       setError('Chọn học sinh.');
       return;
     }
-    const mins = Number(minutes);
-    if (!Number.isInteger(mins) || mins < 1 || mins > 480) {
+    const mins = integerInput(minutes, 1, 480);
+    if (mins === null) {
       setError('Thời lượng phải là số nguyên 1–480 phút.');
       return;
     }
-    const parsed = new Date(start);
-    if (Number.isNaN(parsed.getTime())) {
+    const parsed = parseLocalDateTime(start);
+    if (!parsed) {
       setError('Giờ bắt đầu không hợp lệ.');
       return;
     }
+    await submission.run(async () => {
     try {
-      if (initial.id) {
-        await update.mutateAsync({ id: initial.id, dto: { scheduledStart: parsed.toISOString(), scheduledMinutes: mins, subject } });
+      if (lesson) {
+        await update.mutateAsync({ id: lesson.id, dto: { scheduledStart: parsed.toISOString(), scheduledMinutes: mins, subject } });
         push('Đã dời buổi học.');
       } else {
         await create.mutateAsync({ studentId, scheduledStart: parsed.toISOString(), scheduledMinutes: mins, subject, timeZone: DEFAULT_TZ });
@@ -88,11 +114,12 @@ function LessonDialog({
         setError('Không lưu được. Thử lại.');
       }
     }
+    });
   }
 
   return (
-    <Dialog open onClose={onClose} title={initial.id ? 'Sửa buổi học' : 'Tạo buổi học'}>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+    <Dialog open onClose={close} title={lesson ? 'Sửa buổi học' : 'Tạo buổi học'}>
+      <form noValidate aria-busy={pending} onSubmit={handleSubmit} className="flex flex-col gap-3">
         {error ? (
           <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
             {error}
@@ -100,8 +127,9 @@ function LessonDialog({
         ) : null}
         <div>
           <Label htmlFor="les-student">Học sinh *</Label>
-          <Select id="les-student" value={studentId} onChange={(e) => setStudentId(e.target.value)} disabled={!!initial.id}>
+          <Select id="les-student" value={studentId} onChange={(e) => setStudentId(e.target.value)} disabled={!!lesson || pending || confirmCancel || students.isPending || students.isError}>
             <option value="">— Chọn —</option>
+            {lesson && !(students.data?.items ?? []).some((s) => s.id === lesson.studentId) ? <option value={lesson.studentId}>{lesson.student?.name ?? `Học sinh (${lesson.studentId})`}</option> : null}
             {(students.data?.items ?? []).map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
@@ -111,7 +139,7 @@ function LessonDialog({
         </div>
         <div>
           <Label htmlFor="les-subject">Môn học *</Label>
-          <Select id="les-subject" value={subject} onChange={(e) => setSubject(e.target.value as Subject)}>
+          <Select id="les-subject" disabled={locked} value={subject} onChange={(e) => setSubject(e.target.value as Subject)}>
             {SUBJECTS.map((m) => (
               <option key={m} value={m}>
                 {m}
@@ -122,22 +150,35 @@ function LessonDialog({
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <Label htmlFor="les-start">Bắt đầu *</Label>
-            <Input id="les-start" type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} />
+            <Input id="les-start" disabled={locked} type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} />
           </div>
           <div>
             <Label htmlFor="les-minutes">Phút *</Label>
-            <Input id="les-minutes" inputMode="numeric" value={minutes} onChange={(e) => setMinutes(e.target.value)} />
+            <Input id="les-minutes" disabled={locked} inputMode="numeric" value={minutes} onChange={(e) => setMinutes(e.target.value)} />
           </div>
         </div>
         <p className="text-xs text-slate-500">Múi giờ: {DEFAULT_TZ}. Giờ lưu UTC, hiển thị giờ địa phương.</p>
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            {vi.cancel}
-          </Button>
-          <Button type="submit" disabled={pending}>
-            {pending ? vi.loading : vi.save}
-          </Button>
-        </div>
+        {students.isPending && !lesson ? <p role="status" className="text-sm">Đang tải học sinh…</p> : null}
+        {students.isError ? <div role="alert" className="text-sm">Không tải được danh sách học sinh. <Button variant="secondary" onClick={() => students.refetch()}>Thử lại</Button></div> : null}
+        {lesson && lesson.status !== 'scheduled' ? <p role="status" className="text-sm">Buổi học {lesson.status === 'completed' ? 'đã hoàn thành' : 'đã hủy'} — chỉ xem thông tin, không sửa lịch sử.</p> : null}
+        {confirmCancel ? (
+          <div className="rounded-xl border p-3 space-y-3">
+            <p>Bạn muốn hủy buổi học này? Lịch sử vẫn được giữ lại.</p>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="secondary" disabled={pending} onClick={() => setConfirmCancel(false)}>Quay lại</Button>
+              <Button variant="danger" disabled={pending} onClick={handleCancel}>{pending ? vi.loading : 'Xác nhận hủy'}</Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-wrap justify-end gap-2">
+            {lesson?.status === 'scheduled' ? <>
+              <Button variant="danger" disabled={pending} onClick={() => { setError(null); setConfirmCancel(true); }}>Hủy buổi học</Button>
+              <Button variant="secondary" disabled={pending} onClick={() => { if (!submission.pending) onComplete(lesson); }}>Hoàn thành</Button>
+            </> : null}
+            <Button type="button" variant="secondary" disabled={pending} onClick={close}>{vi.cancel}</Button>
+            {!lesson || lesson.status === 'scheduled' ? <Button type="submit" disabled={pending || (!lesson && (students.isPending || students.isError))}>{pending ? vi.loading : vi.save}</Button> : null}
+          </div>
+        )}
       </form>
     </Dialog>
   );
@@ -153,7 +194,7 @@ export function CalendarPage() {
     const to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
     return { from: from.toISOString(), to: to.toISOString() };
   });
-  const [dialog, setDialog] = useState<{ id?: string; start: Date; studentId?: string } | null>(null);
+  const [dialog, setDialog] = useState<LessonDraft | null>(null);
   const [pendingDrop, setPendingDrop] = useState<{ id: string; start: Date } | null>(null);
   const [completing, setCompleting] = useState<LessonItem | null>(null);
 
@@ -166,7 +207,7 @@ export function CalendarPage() {
   });
   const students = useStudents({ status: 'active', pageSize: 100 });
   const update = useUpdateLesson();
-  const cancel = useCancelLesson();
+  const [dropGate] = useState(createSubmissionGate);
 
   const events: EventInput[] = useMemo(
     () =>
@@ -177,6 +218,9 @@ export function CalendarPage() {
         end: new Date(new Date(l.scheduledStart).getTime() + l.scheduledMinutes * 60000).toISOString(),
         backgroundColor: eventColor(l.status),
         borderColor: eventColor(l.status),
+        textColor: '#ffffff',
+        startEditable: l.status === 'scheduled',
+        durationEditable: false,
         extendedProps: { status: l.status },
       })),
     [lessons.data],
@@ -190,12 +234,13 @@ export function CalendarPage() {
     const id = arg.event.id;
     const start = arg.event.start;
     if (!start) return;
-    setDialog({ id, start, studentId: undefined });
+    const lesson = lessons.data?.items.find((item) => item.id === id);
+    if (lesson) setDialog({ start, studentId: lesson.studentId, lesson });
   }
 
   function handleDrop(arg: EventDropArg) {
     const start = arg.event.start;
-    if (!start) {
+    if (!start || arg.event.extendedProps['status'] !== 'scheduled') {
       arg.revert();
       return;
     }
@@ -204,15 +249,16 @@ export function CalendarPage() {
   }
 
   async function confirmDrop() {
-    if (!pendingDrop) return;
-    try {
-      await update.mutateAsync({ id: pendingDrop.id, dto: { scheduledStart: pendingDrop.start.toISOString() } });
-      push('Đã dời buổi học.');
-    } catch (err) {
-      push(err instanceof ApiError && err.code === 'CONFLICT' ? 'Trùng lịch — giữ nguyên giờ cũ.' : 'Không dời được.');
-    } finally {
-      setPendingDrop(null);
-    }
+    if (!pendingDrop || update.isPending || dropGate.pending) return;
+    await dropGate.run(async () => {
+      try {
+        await update.mutateAsync({ id: pendingDrop.id, dto: { scheduledStart: pendingDrop.start.toISOString() } });
+        push('Đã dời buổi học.');
+        setPendingDrop(null);
+      } catch (err) {
+        push(err instanceof ApiError && err.code === 'CONFLICT' ? 'Trùng lịch — giữ nguyên giờ cũ.' : 'Không dời được. Vui lòng thử lại.');
+      }
+    });
   }
 
   return (
@@ -275,15 +321,15 @@ export function CalendarPage() {
         />
       </div>
 
-      {dialog ? <LessonDialog initial={dialog} onClose={() => setDialog(null)} /> : null}
+      {dialog ? <LessonDialog initial={dialog} onClose={() => setDialog(null)} onComplete={(lesson) => { setDialog(null); setCompleting(lesson); }} /> : null}
 
       {pendingDrop ? (
-        <Dialog open onClose={() => setPendingDrop(null)} title="Xác nhận dời lịch?">
+        <Dialog open onClose={() => { if (!update.isPending && !dropGate.pending) setPendingDrop(null); }} title="Xác nhận dời lịch?">
           <p className="text-sm">
             Dời sang {pendingDrop.start.toLocaleString('vi-VN')}? Hệ thống sẽ kiểm tra trùng lịch trước khi lưu.
           </p>
           <div className="mt-4 flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setPendingDrop(null)}>
+            <Button variant="secondary" disabled={update.isPending} onClick={() => { if (!dropGate.pending) setPendingDrop(null); }}>
               {vi.cancel}
             </Button>
             <Button onClick={confirmDrop} disabled={update.isPending}>
@@ -293,32 +339,7 @@ export function CalendarPage() {
         </Dialog>
       ) : null}
 
-      {dialog?.id ? (
-        <div className="flex justify-end gap-2">
-          <Button
-            onClick={() => {
-              const found = (lessons.data?.items ?? []).find((l: LessonItem) => l.id === dialog.id);
-              if (found && found.status === 'scheduled') setCompleting(found);
-              else push('Chỉ hoàn thành buổi đang lên lịch.');
-            }}
-          >
-            Hoàn thành
-          </Button>
-          <Button
-            variant="danger"
-            onClick={() =>
-              cancel.mutate(dialog.id as string, {
-                onSuccess: () => {
-                  push('Đã hủy buổi học (giữ lại lịch sử).');
-                  setDialog(null);
-                },
-              })
-            }
-          >
-            Hủy buổi học
-          </Button>
-        </div>
-      ) : null}
+
 
       {completing ? <CompleteLessonDialog lesson={completing} onClose={() => setCompleting(null)} /> : null}
     </Page>

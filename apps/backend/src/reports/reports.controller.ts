@@ -17,12 +17,7 @@ export class ReportsController {
 
   @Get('monthly')
   async monthly(@Query('year') year: string, @Query('month') month: string) {
-    const y = Number(year);
-    const m = Number(month);
-    if (!Number.isInteger(y) || !Number.isInteger(m) || m < 1 || m > 12) {
-      return { ok: false, error: { code: 'VALIDATION', message: 'year/month must be valid (month 1-12)' } };
-    }
-    return { ok: true, data: await this.service.monthlySummary(y, m) };
+    return { ok: true, data: await this.service.monthlySummary(year, month) };
   }
 
   @Get('bonus')

@@ -27,10 +27,12 @@ export function usePayments(studentId: string | undefined) {
 
 function useInvalidateTuition() {
   const qc = useQueryClient();
-  return () => {
-    qc.invalidateQueries({ queryKey: tuitionKeys.all });
-    qc.invalidateQueries({ queryKey: ['lessons'] });
-  };
+  return () => Promise.all([
+    qc.invalidateQueries({ queryKey: tuitionKeys.all }),
+    qc.invalidateQueries({ queryKey: ['lessons'] }),
+    qc.invalidateQueries({ queryKey: ['reports'] }),
+    qc.invalidateQueries({ queryKey: ['students'] }),
+  ]);
 }
 
 export function useCreatePayment() {

@@ -49,11 +49,11 @@ export class StudentsService {
     }
     return this.repo.update(id, {
       ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
-      ...(dto.phone !== undefined ? { phone: trimOrUndefined(dto.phone) } : {}),
-      ...(dto.parentContact !== undefined ? { parentContact: trimOrUndefined(dto.parentContact) } : {}),
-      ...(dto.grade !== undefined ? { grade: trimOrUndefined(dto.grade) } : {}),
+      ...(dto.phone !== undefined ? { phone: trimOrUndefined(dto.phone) ?? null } : {}),
+      ...(dto.parentContact !== undefined ? { parentContact: trimOrUndefined(dto.parentContact) ?? null } : {}),
+      ...(dto.grade !== undefined ? { grade: trimOrUndefined(dto.grade) ?? null } : {}),
       ...(dto.hourlyRateVnd !== undefined ? { hourlyRateVnd: dto.hourlyRateVnd } : {}),
-      ...(dto.notes !== undefined ? { notes: trimOrUndefined(dto.notes) } : {}),
+      ...(dto.notes !== undefined ? { notes: trimOrUndefined(dto.notes) ?? null } : {}),
     });
   }
 

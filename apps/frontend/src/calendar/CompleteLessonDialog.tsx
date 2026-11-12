@@ -7,6 +7,7 @@ import { Input, Label, Select } from '../components/Field';
 import { useCompleteLesson, type LessonItem } from '../hooks/useLessons';
 import { vi } from '../i18n';
 import { useToast } from '../toast';
+import { createSubmissionGate, integerInput } from '../hooks/formValidation';
 
 function previewBillable(scheduled: number, actual: number, policy: 'actual' | 'planned', bonusBillable: boolean): number {
   const bonus = Math.max(0, actual - scheduled);
@@ -16,23 +17,30 @@ function previewBillable(scheduled: number, actual: number, policy: 'actual' | '
 export function CompleteLessonDialog({ lesson, onClose }: { lesson: LessonItem; onClose: () => void }) {
   const { push } = useToast();
   const complete = useCompleteLesson();
+  const [submission] = useState(createSubmissionGate);
   const [actual, setActual] = useState(String(lesson.scheduledMinutes));
   const [bonusBillable, setBonusBillable] = useState(false);
   const [policy, setPolicy] = useState<'actual' | 'planned'>(lesson.billingPolicy ?? 'actual');
   const [error, setError] = useState<string | null>(null);
 
-  const actualNum = Number(actual);
-  const valid = Number.isInteger(actualNum) && actualNum >= 1 && actualNum <= 480;
+  const actualNum = integerInput(actual, 1, 480) ?? 0;
+  const valid = actualNum > 0;
   const bonus = valid ? Math.max(0, actualNum - lesson.scheduledMinutes) : 0;
   const billable = valid ? previewBillable(lesson.scheduledMinutes, actualNum, policy, bonusBillable) : 0;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (complete.isPending || submission.pending) return;
     setError(null);
+    if (lesson.status !== 'scheduled') {
+      setError('Chỉ có thể hoàn thành buổi học đang lên lịch. Vui lòng tải lại danh sách.');
+      return;
+    }
     if (!valid) {
       setError('Phút thực dạy phải là số nguyên 1–480.');
       return;
     }
+    await submission.run(async () => {
     try {
       await complete.mutateAsync({ id: lesson.id, dto: { actualMinutes: actualNum, bonusBillable, billingPolicy: policy } });
       push('Đã hoàn thành buổi học.');
@@ -40,10 +48,11 @@ export function CompleteLessonDialog({ lesson, onClose }: { lesson: LessonItem; 
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Không lưu được. Thử lại.');
     }
+    });
   }
 
   return (
-    <Dialog open onClose={onClose} title="Hoàn thành buổi học">
+    <Dialog open onClose={() => { if (!submission.pending) onClose(); }} title="Hoàn thành buổi học">
       <div className="mb-3 flex flex-wrap gap-2 text-sm">
         <span>Dự kiến <strong>{lesson.scheduledMinutes}′</strong></span>
         {bonus > 0 ? (
@@ -53,7 +62,7 @@ export function CompleteLessonDialog({ lesson, onClose }: { lesson: LessonItem; 
         )}
         <span>Tính phí <strong>{valid ? billable : '—'}′</strong></span>
       </div>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+      <form noValidate aria-busy={complete.isPending} onSubmit={handleSubmit} className="flex flex-col gap-3">
         {error ? (
           <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
             {error}
@@ -61,7 +70,7 @@ export function CompleteLessonDialog({ lesson, onClose }: { lesson: LessonItem; 
         ) : null}
         <div>
           <Label htmlFor="cmp-actual">Phút thực dạy *</Label>
-          <Input id="cmp-actual" inputMode="numeric" value={actual} onChange={(e) => setActual(e.target.value)} />
+          <Input required maxLength={3} id="cmp-actual" inputMode="numeric" value={actual} onChange={(e) => setActual(e.target.value)} />
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
@@ -83,7 +92,7 @@ export function CompleteLessonDialog({ lesson, onClose }: { lesson: LessonItem; 
           Học phí dự kiến: {valid ? formatVnd(Math.round((lesson.hourlyRateVnd * billable) / 60)) : '—'} (giữ nguyên đơn giá {formatVnd(lesson.hourlyRateVnd)}/giờ).
         </p>
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button type="button" variant="secondary" disabled={complete.isPending} onClick={onClose}>
             {vi.cancel}
           </Button>
           <Button type="submit" disabled={complete.isPending}>
